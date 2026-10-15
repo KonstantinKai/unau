@@ -1,6 +1,7 @@
-# revmark
-
-Terminal code review that ends in a file an agent can act on.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/header-dark.png">
+  <img alt="revmark: terminal code review that ends in a file an agent can act on." src="assets/brand/header-light.png">
+</picture>
 
 Open the working tree diff (or a commit, or a range) in a lazygit-shaped TUI: a
 folding file tree on the left, the diff on the right. Stage the lines that are
@@ -8,6 +9,29 @@ right. Mark the lines that aren't with a comment, a question, or replacement
 code. Every mark lands in `.revmark/<date>-<n>.md` as it happens, a Markdown
 checklist with anchors an agent can follow. Point your agent at the file, let it
 work, reopen the review to see what changed, accept or push back.
+
+## How to work with revmark
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/workflow-dark.png">
+  <img alt="Who does what: you read the diff, stage what is right and mark what is wrong; revmark writes each mark to the review file and runs your agent on it; the agent works each item from [~] to [x]; revmark picks up the ticks and shows each one against the code now; you accept or push back until nothing is open or unstaged." src="assets/workflow-light.png">
+</picture>
+
+1. **Review.** Walk the diff. Stage what is right (`s` lines or hunks, `gs` a
+   whole file); staged means accepted, so it never reaches the agent.
+2. **Mark.** Comment on what is wrong: `c` a fix or a question, `S` replacement
+   code, `C` the whole file, `n` a general note. Each one is written to the
+   review file the moment you make it, anchored to new-side lines with the code
+   quoted.
+3. **Hand off.** `r` runs your agent on the review file, in a tmux or Herdr
+   pane, the foreground, or the run pane inside revmark. The agent marks the
+   item it is on `[~]`, ticks it `[x]` with a note when done, and never stages.
+4. **Re-review.** revmark picks the ticks up live (or later with `--continue`).
+   Each ticked item shows its quoted lines against the code now. `a` accepts:
+   the fix is staged and the item leaves the file. `c` pushes back with a new
+   open item for the next run.
+5. **Done** when no item is open and nothing is left unstaged. Commit as you
+   normally would; revmark never commits.
 
 ## Install
 
@@ -101,7 +125,6 @@ one small file per repository and never inside it; delete one to start clean.
 | `t` | unified / side by side |
 | `r` | run the configured command on the review file (with `in = "pane"`: again while running offers to stop it) |
 | `R` | show / hide the run pane |
-| `4` | focus the run pane, to scroll back through the output |
 | `,` | open your config in `$EDITOR` (created with every setting commented out the first time) |
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
@@ -343,8 +366,10 @@ dark = "gruvbox.dark"
   missing or unreadable `.tmTheme`, or an unknown `extends` stops revmark and
   names the theme and the problem.
 
-`r` substitutes the absolute review path for `{file}`. Where it runs depends on
-`[run] in`:
+### Running an agent
+
+`r` runs `[run] command` with `{file}` replaced by the absolute path of the
+review file. Where it runs depends on `[run] in`:
 
 | `in` | Runs the command |
 |---|---|
@@ -366,9 +391,18 @@ again offers to stop it, and quitting revmark stops it too. For an agent you
 talk to while it works, use tmux, Herdr or the foreground.
 
 The run pane's title shows how long the command has been running, then how
-long it took. `4` (or `Tab`, which comes to it after the diff and comments) focuses it: `j`/`k` and the scroll
-keys move through the output, long lines wrap, `gg` goes to the top and `G`
-back to the newest output, which then stays in view as more arrives.
+long it took. `4` focuses it (so does `Tab`, after the diff and comments):
+`j`/`k` and the scroll keys move through the output, long lines wrap, `gg`
+goes to the top and `G` back to the newest output, which then stays in view as
+more arrives.
+
+While the agent works, the review file is the progress report: the default
+instructions ask the agent to set `status: in-progress` first and to mark each
+item `[~]` before working on it. revmark shows those marks as `~` in the
+comments pane and the diff, and counts them in the status line
+(`2 open · 1 working`).
+
+### Following Claude as it works
 
 Some agents print nothing until they finish when they have no terminal;
 `claude -p` prints only its final answer. To follow Claude as it works, have
@@ -400,10 +434,7 @@ wrap between words with list items indented under their text. Lines that are
 not stream events (stderr, or any other agent) pass through unchanged, so the
 setting is safe to leave on.
 
-Either way, the review file is the progress report: the default instructions ask the agent to set
-`status: in-progress` first and to mark each item `[~]` before working on it.
-revmark shows those marks as `~` in the comments pane and the diff, and counts
-them in the status line (`2 open · 1 working`).
+### Editor
 
 `$VISUAL`, then `$EDITOR`, then `vi` edits suggestions and long comments, and
 opens files with `o`. The cursor line is passed as `+N` to vi, Vim, Neovim,
@@ -411,6 +442,21 @@ nano, Emacs, micro and Kakoune, as `path:N` to Helix, Zed and Sublime Text,
 and as `--goto path:N` to VS Code, VSCodium and Cursor; any other editor gets
 the plain path.
 
+## Credits
+
+- [annodiff](https://github.com/MelsRoughSketch/annodiff) by MelsRoughSketch:
+  the main reference; some code adapted (MIT, see `assets/notices/`)
+- [reslop](https://github.com/tshemsedinov/reslop) by Timur Shemsedinov: the
+  review file format
+- [lazygit](https://github.com/jesseduffield/lazygit) by Jesse Duffield: the
+  layout and line staging
+- [Catppuccin](https://github.com/catppuccin/catppuccin): the default themes
+
 ## License
 
-MIT. Copyright (c) 2026 Konstantin Kai.
+MIT. Copyright (c) 2026 Konstantin Kai. Dependencies and bundled code and
+themes keep their own licenses; see
+[third-party notices](THIRD_PARTY_NOTICES.md) and `assets/notices/`.
+
+Run `revmark --licenses` to print every included license text and
+attribution.
