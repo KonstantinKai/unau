@@ -31,6 +31,28 @@ pub struct Args {
     /// A path, after `--`, read as a path even if a revision has the same name.
     #[arg(last = true, value_name = "PATH")]
     pub path: Option<PathBuf>,
+
+    /// Print the licenses and third-party notices included in revmark.
+    #[arg(long, exclusive = true)]
+    pub licenses: bool,
+}
+
+/// Every license text revmark carries: its own, the notices for code and
+/// themes bundled in it, its dependencies' notices, and those of the syntax
+/// definitions and themes `two-face` embeds, which no crate manifest lists.
+pub fn licenses() -> String {
+    let embedded = format!(
+        "# Syntax definitions and themes embedded through two-face\n\n{}",
+        two_face::acknowledgement::listing().to_md()
+    );
+    [
+        include_str!("../LICENSE"),
+        include_str!("../assets/notices/ANNODIFF-LICENSE"),
+        include_str!("../assets/themes/CATPPUCCIN-LICENSE"),
+        include_str!("../THIRD_PARTY_NOTICES.md"),
+        &embedded,
+    ]
+    .join("\n\n")
 }
 
 impl Args {
@@ -175,6 +197,27 @@ mod tests {
         ] {
             assert!(Args::try_parse_from(clash).is_err(), "{clash:?}");
         }
+    }
+
+    #[test]
+    fn licenses_carry_every_bundled_and_dependency_notice() {
+        let text = licenses();
+        for part in [
+            "MIT License",
+            "MelsRoughSketch",
+            "Catppuccin",
+            "# Third-party notices",
+            "### MIT License",
+            "embedded through two-face",
+        ] {
+            assert!(text.contains(part), "missing {part}");
+        }
+        assert!(
+            Args::try_parse_from(["revmark", "--licenses"])
+                .unwrap()
+                .licenses
+        );
+        assert!(Args::try_parse_from(["revmark", "--licenses", "HEAD"]).is_err());
     }
 
     #[test]

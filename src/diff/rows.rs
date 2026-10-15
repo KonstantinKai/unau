@@ -92,6 +92,10 @@ pub fn build_rows(
                 continue;
             }
             let start_row = rows.len();
+            // Pairing a run of removed and added lines side by side, in source
+            // order, is adapted from annodiff's `split_rows` (MIT, Copyright
+            // (c) 2026 MelsRoughSketch); its notice is in
+            // assets/notices/ANNODIFF-LICENSE.
             if split && lines[i].is_change() {
                 let (mut old, mut new) = (Vec::new(), Vec::new());
                 while i < lines.len() && view.visible[i] && lines[i].is_change() {

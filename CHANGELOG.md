@@ -57,6 +57,8 @@ First release.
 - `[review] dir` moves review files out of `.revmark/`, to another folder in
   the repository or outside it (`~/reviews/{repo}`), so a repository can stay
   free of review files.
+- `--licenses` prints revmark's license and every third-party notice it
+  carries, including those of the bundled syntax definitions and themes.
 - `--continue` reopens the newest review in `.revmark/`, or starts a new one
   when there is none.
 - Every key can be rebound in `config.toml` or a repository `.revmark.toml`.

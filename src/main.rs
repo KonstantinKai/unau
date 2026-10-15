@@ -35,6 +35,10 @@ fn main() {
 
 fn start() -> Result<()> {
     let args = cli::Args::parse();
+    if args.licenses {
+        print!("{}", cli::licenses());
+        return Ok(());
+    }
     let stdout = args.stdout()?;
     let cwd = std::env::current_dir()?;
     let user_config = cli::user_config();

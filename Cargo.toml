@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/KonstantinKai/revmark"
 keywords = ["tui", "git", "diff", "code-review", "agent"]
 categories = ["command-line-utilities", "development-tools"]
-include = ["src/**/*", "assets/themes/*", "README.md", "CHANGELOG.md", "LICENSE", "Cargo.toml"]
+include = ["src/**/*", "assets/themes/*", "assets/notices/*", "THIRD_PARTY_NOTICES.md", "README.md", "CHANGELOG.md", "LICENSE", "Cargo.toml"]
 
 [dependencies]
 anyhow = "1"
