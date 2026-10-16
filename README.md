@@ -57,7 +57,8 @@ curl -LsSf https://github.com/KonstantinKai/unau/releases/latest/download/unau-i
 ```
 
 The [releases page](https://github.com/KonstantinKai/unau/releases) has the
-archives and checksums. unau needs `git` on `PATH`. unau shells out to it and links no git library.
+archives and checksums. unau needs `git` on `PATH`. On Windows, use it inside
+WSL with the Linux build; there is no native Windows build yet. unau shells out to it and links no git library.
 
 ## Usage
 
