@@ -6,7 +6,7 @@
 
 use crossterm::{
     cursor::{Hide, Show},
-    event::{DisableBracketedPaste, EnableBracketedPaste},
+    event::{DisableBracketedPaste, DisableFocusChange, EnableBracketedPaste, EnableFocusChange},
     execute, queue,
     terminal::{
         BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen,
@@ -38,7 +38,10 @@ pub fn enter() -> io::Result<()> {
         io::stderr(),
         EnterAlternateScreen,
         Hide,
-        EnableBracketedPaste
+        EnableBracketedPaste,
+        // Lets the working-tree check pause while another window has focus.
+        // Terminals that never report focus simply keep it checking.
+        EnableFocusChange
     )
 }
 
@@ -54,6 +57,7 @@ pub fn leave() -> io::Result<()> {
     let raw = disable_raw_mode();
     execute!(
         io::stderr(),
+        DisableFocusChange,
         DisableBracketedPaste,
         LeaveAlternateScreen,
         Show

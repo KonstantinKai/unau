@@ -112,7 +112,7 @@ impl Snapshot {
 
 /// Review folders are never part of the change under review: the default one
 /// always, and a configured one when it is inside the repository.
-fn under_review_dir(path: &str, configured: Option<&str>) -> bool {
+pub(super) fn under_review_dir(path: &str, configured: Option<&str>) -> bool {
     std::iter::once(REVIEW_DIR)
         .chain(configured)
         .any(|dir| path == dir || path.starts_with(&format!("{dir}/")))

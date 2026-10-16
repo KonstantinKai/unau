@@ -3,10 +3,12 @@
 mod apply;
 mod parse;
 mod snapshot;
+mod watch;
 
 pub use apply::{Change, apply, apply_files};
 pub use parse::{FileDiff, Line, LineKind, parse};
 pub use snapshot::{FileStatus, Section, SectionKind, Snapshot, snapshot};
+pub use watch::fingerprint;
 
 use anyhow::{Context, Result, bail};
 use std::{

@@ -21,10 +21,16 @@ use config::{Config, Key};
 use crossterm::event::{self, Event, KeyEventKind};
 use git::{Target, snapshot};
 use review::Review;
-use std::{io::Write, path::Path, time::Duration};
+use std::{
+    io::Write,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 /// How often the loop wakes without input to pick up agent edits.
 const TICK: Duration = Duration::from_millis(250);
+/// How often the working tree is checked for changes made outside unau.
+const WATCH_EVERY: Duration = Duration::from_secs(1);
 
 fn main() {
     if let Err(err) = start() {
@@ -96,6 +102,8 @@ fn start() -> Result<()> {
     state.layout.theme = theme;
     state.config_files = config_files;
     state.apply_instructions();
+    // Records where the working tree stands, so later changes stand out.
+    state.poll_worktree();
     if nothing_to_continue {
         let dir = state.repo.review_dir();
         state.info(format!(
@@ -136,6 +144,7 @@ fn start() -> Result<()> {
 fn event_loop(tui: &mut terminal::Tui, state: &mut AppState) -> Result<()> {
     // A run in the run pane: the process stays here, its output goes to the state.
     let mut background: Option<run::Background> = None;
+    let mut watched = Instant::now();
     loop {
         pump(state, &mut background);
         terminal::draw(tui, |frame| ui::render(state, frame))?;
@@ -144,6 +153,12 @@ fn event_loop(tui: &mut terminal::Tui, state: &mut AppState) -> Result<()> {
                 refresh(state);
             }
             state.poll_config();
+            // A `git status` each tick would cost more than it buys; a second
+            // is soon enough to see an agent's edit.
+            if watched.elapsed() >= WATCH_EVERY {
+                watched = Instant::now();
+                state.poll_worktree();
+            }
             continue;
         }
         let effect = match event::read()? {
@@ -156,6 +171,14 @@ fn event_loop(tui: &mut terminal::Tui, state: &mut AppState) -> Result<()> {
             }
             Event::Resize(width, height) => {
                 state.resize(width, height);
+                Effect::None
+            }
+            Event::FocusGained => {
+                state.window_focus(true);
+                Effect::None
+            }
+            Event::FocusLost => {
+                state.window_focus(false);
                 Effect::None
             }
             _ => Effect::None,

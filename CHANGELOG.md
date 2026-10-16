@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Edits made outside unau, by an agent in another pane, another editor or
+  `git` in another shell, never showed until the review file changed or an
+  editor opened from unau closed. The working tree is now checked every
+  second while unau's window has focus, and re-read when it changed.
+
 ## 0.1.0 - 2026-10-16
 
 First release.
