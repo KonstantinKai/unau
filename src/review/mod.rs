@@ -54,9 +54,6 @@ impl Elision {
 /// Heading of the instructions block in a review file.
 pub const INSTRUCTIONS_HEADING: &str = "> **Agent instructions**";
 
-/// How instructions started in review files written before the block existed.
-pub const LEGACY_INSTRUCTIONS_PREFIX: &str = "Agent instructions:";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Kind {
     Fix,

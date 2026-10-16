@@ -3,9 +3,7 @@
 //! which is kept verbatim.
 
 use super::write::{IN_PLACE_OF, REMOVED_LANG, REPLACE_WITH};
-use super::{
-    Elision, INSTRUCTIONS_HEADING, Item, Kind, LEGACY_INSTRUCTIONS_PREFIX, Review, Scope, Status,
-};
+use super::{Elision, INSTRUCTIONS_HEADING, Item, Kind, Review, Scope, Status};
 use anyhow::{Result, bail};
 
 pub fn parse(text: &str) -> Result<Review> {
@@ -64,14 +62,6 @@ pub fn parse(text: &str) -> Result<Review> {
             while i < lines.len() && lines[i].starts_with('>') {
                 let quoted = &lines[i][1..];
                 text.push(quoted.strip_prefix(' ').unwrap_or(quoted));
-                i += 1;
-            }
-            review.instructions = trim_blank(&text);
-        } else if section.is_none() && line.starts_with(LEGACY_INSTRUCTIONS_PREFIX) {
-            let mut text = vec![line[LEGACY_INSTRUCTIONS_PREFIX.len()..].trim_start()];
-            i += 1;
-            while i < lines.len() && !lines[i].trim().is_empty() {
-                text.push(lines[i]);
                 i += 1;
             }
             review.instructions = trim_blank(&text);
@@ -455,19 +445,6 @@ mod tests {
         let text = write(&review);
         assert!(text.contains("> **Agent instructions**\n>\n> Run `pnpm test` first.\n>\n> - one\n>   - nested\n> > quoted\n"), "{text}");
         assert_eq!(parse(&text).unwrap(), review);
-    }
-
-    #[test]
-    fn old_instruction_paragraphs_are_read_and_rewritten_as_a_block() {
-        let old = "---\ntool: unau 0.1.0\nstatus: open\nbase: HEAD\nfiles:\n---\n\n# Review 2026-10-14-00\n\nAgent instructions: work through unchecked items, mark `[x]` when the change is\nmade and tests pass.\n\n## General\n\n- [ ] fix: one\n";
-        let review = parse(old).unwrap();
-        assert_eq!(
-            review.instructions,
-            "work through unchecked items, mark `[x]` when the change is\nmade and tests pass."
-        );
-        assert_eq!(review.items.len(), 1);
-        assert!(review.extra.is_empty(), "{:?}", review.extra);
-        assert!(write(&review).contains("> **Agent instructions**\n>\n> work through"));
     }
 
     #[test]
