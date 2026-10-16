@@ -1,25 +1,21 @@
 [workspace]
 members = ["cargo:."]
 
-# Config for 'dist'
 [dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.32.0"
-# CI backends to support
 ci = "github"
-# The installers to generate for each app
-installers = ["shell", "homebrew"]
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
-# A custom GitHub repo to publish the Homebrew formula to
-tap = "KonstantinKai/homebrew-tap"
-# Publish jobs to run in CI
-publish-jobs = ["homebrew"]
-# Extra files to ship in each archive
-include = ["THIRD_PARTY_NOTICES.md"]
-# Path that installers should place binaries in
-install-path = "CARGO_HOME"
-# Where to host releases
 hosting = "github"
-# Whether to install an updater program
+installers = ["shell", "homebrew"]
+# No Windows: running the agent in a pane needs tmux or Herdr, and unau has
+# never been tried there. `dist init` adds it by default; leave it out.
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+tap = "KonstantinKai/homebrew-tap"
+publish-jobs = ["homebrew"]
+# The bundled crates' and themes' licenses ask for their notices to go with
+# every copy of the binary.
+include = ["THIRD_PARTY_NOTICES.md"]
+# Where `cargo install` puts it too, so either way of installing replaces the
+# other instead of leaving two copies on PATH.
+install-path = "CARGO_HOME"
+# Upgrades go through brew, cargo or rerunning the installer.
 install-updater = false
