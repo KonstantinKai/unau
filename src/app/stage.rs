@@ -5,7 +5,7 @@
 use super::{AppState, Effect, Pane, Pending};
 use crate::{
     diff::Row,
-    git::{Change, FileDiff, LineKind, SectionKind, apply, apply_files},
+    git::{Change, FileDiff, SectionKind, apply, apply_files},
     review::{Item, Scope},
     tree::Entry,
 };
@@ -312,17 +312,11 @@ fn touched_items(
     diff: &crate::git::FileDiff,
     selected: &[bool],
 ) -> Vec<Item> {
-    let mut touched = BTreeSet::new();
-    for (i, line) in diff.lines.iter().enumerate() {
-        if !selected[i] {
-            continue;
-        }
-        let at = match line.kind {
-            LineKind::Removed => diff.lines[i..].iter().find_map(|l| l.new),
-            _ => line.new,
-        };
-        touched.insert(at.unwrap_or(usize::MAX));
-    }
+    let new_lines = super::rereview::touched_new(diff);
+    let touched: BTreeSet<usize> = (0..diff.lines.len())
+        .filter(|&i| selected[i])
+        .map(|i| new_lines[i])
+        .collect();
     items
         .iter()
         .filter(|item| match &item.scope {

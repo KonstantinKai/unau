@@ -18,7 +18,7 @@ pub struct Region {
 /// Where an item's lines are in `new_text` now. Tries the anchor, then the
 /// quoted lines anywhere (nearest wins), then the first or last quoted line
 /// alone, then the anchor itself if a change in `changed` (new-side lines
-/// touched by the unstaged diff) lands on it. `None` means the anchor is lost.
+/// the changes touch, staged ones included) lands on it. `None` means the anchor is lost.
 pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Option<Region> {
     let Scope::Lines {
         start,
@@ -167,9 +167,9 @@ pub fn line_diff(then: &[String], now: &[String]) -> Vec<NoteLine> {
     out
 }
 
-/// New-side position each change line touches: its own number, or for a
-/// removed line the new line it sits before.
-fn touched_new(diff: &FileDiff) -> Vec<usize> {
+/// New-side position each line touches: its own number, or for a removed
+/// line the new line it sits before (one past the last when none follows).
+pub(super) fn touched_new(diff: &FileDiff) -> Vec<usize> {
     // One pass from the end, so a long run of removals costs its length
     // rather than its length squared.
     let past_end = diff.lines.iter().filter_map(|l| l.new).max().unwrap_or(0) + 1;
