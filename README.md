@@ -46,12 +46,18 @@ person can all work from it.
 ## Install
 
 ```sh
-git clone https://github.com/KonstantinKai/unau
-cd unau
-cargo install --path .
+brew install KonstantinKai/tap/unau                 # macOS and Linux
+cargo install unau                                  # from source, Rust 1.92 or newer
 ```
 
-Needs Rust 1.92 or newer, and `git` on `PATH`. unau shells out to it and links no git library.
+Or a prebuilt binary for macOS or Linux (Intel or ARM), into `~/.cargo/bin`:
+
+```sh
+curl -LsSf https://github.com/KonstantinKai/unau/releases/latest/download/unau-installer.sh | sh
+```
+
+The [releases page](https://github.com/KonstantinKai/unau/releases) has the
+archives and checksums. unau needs `git` on `PATH`. unau shells out to it and links no git library.
 
 ## Usage
 
