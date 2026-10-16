@@ -1,4 +1,4 @@
-//! The diff pane: header, dual gutter, omitted-lines separator, selection
+//! The diff pane: header, line-number gutter, omitted-lines separator, selection
 //! band, inline notes, unified or side by side.
 
 use super::border;
@@ -58,7 +58,9 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
         };
         if let Some(bg) = band {
             line = line.style(Style::new().bg(bg));
-            line.spans.iter_mut().for_each(|s| s.style = s.style.bg(bg));
+            for span in &mut line.spans {
+                span.style = span.style.bg(colors.band_over(span.style.bg, bg));
+            }
         }
         lines.push(line);
     }

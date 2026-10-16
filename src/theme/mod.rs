@@ -197,6 +197,31 @@ pub const fn hex(value: u32) -> Color {
     Color::Rgb(r, g, b)
 }
 
+/// Opacity of a changed line's colour over the cursor or selection band:
+/// enough to tell added from removed at a glance, not so much that the band
+/// stops reading as one.
+const BAND_TINT_PERCENT: u16 = 30;
+
+impl Colors {
+    /// The background of a span under the cursor or selection `band`. A plain
+    /// band would hide whether the line was added or removed, leaving only the
+    /// sign to tell, so a changed line keeps its colour mixed into the band.
+    pub fn band_over(&self, span_bg: Option<Color>, band: Color) -> Color {
+        let tint = if span_bg == Some(self.added_bg) {
+            self.added
+        } else if span_bg == Some(self.removed_bg) {
+            self.removed
+        } else {
+            return band;
+        };
+        match (tint, band) {
+            (Color::Rgb(..), Color::Rgb(..)) => blend(tint, band, BAND_TINT_PERCENT),
+            // Named colours cannot be mixed; the line's own tint says more than the band.
+            _ => span_bg.unwrap_or(band),
+        }
+    }
+}
+
 /// `top` laid over `base` at `percent` opacity. Terminals have no
 /// transparency, so tinted backgrounds are mixed ahead of time.
 pub const fn blend(top: Color, base: Color, percent: u16) -> Color {
@@ -217,7 +242,8 @@ const fn mix(top: u8, base: u8, percent: u16) -> u8 {
     ((top as u16 * percent + base as u16 * (100 - percent) + 50) / 100) as u8
 }
 
-/// The colours unau shipped with before themes existed.
+/// Plain colours with syntect's `base16-ocean` syntax, for terminals where the
+/// Catppuccin palette is unwanted.
 pub const DEFAULT_DARK: Theme = Theme {
     name: Cow::Borrowed("default.dark"),
     syntax: Syntax::Builtin(Cow::Borrowed("base16-ocean.dark")),
@@ -336,6 +362,30 @@ mod tests {
         let base = hex(0x000000);
         assert_eq!(blend(hex(0xffffff), base, 20), Color::Rgb(51, 51, 51));
         assert_eq!(blend(hex(0xffffff), base, 100), hex(0xffffff));
+    }
+
+    #[test]
+    fn the_band_keeps_a_changed_line_red_or_green_and_covers_context_plainly() {
+        let colors = DEFAULT_DARK.colors;
+        let band = colors.cursor_bg;
+        let added = colors.band_over(Some(colors.added_bg), band);
+        let removed = colors.band_over(Some(colors.removed_bg), band);
+        assert_eq!(added, blend(colors.added, band, BAND_TINT_PERCENT));
+        assert_eq!(removed, blend(colors.removed, band, BAND_TINT_PERCENT));
+        assert_ne!(added, removed);
+        assert_ne!(added, band);
+        assert_eq!(colors.band_over(None, band), band);
+        assert_eq!(colors.band_over(Some(colors.note_bg), band), band);
+    }
+
+    #[test]
+    fn named_colours_leave_the_line_tint_under_the_band() {
+        let mut colors = DEFAULT_DARK.colors;
+        colors.added = Color::Green;
+        assert_eq!(
+            colors.band_over(Some(colors.added_bg), colors.cursor_bg),
+            colors.added_bg
+        );
     }
 
     #[test]
