@@ -20,10 +20,12 @@ person can all work from it.
 
 ## How to work with unau
 
+<a href="https://raw.githubusercontent.com/KonstantinKai/unau/main/assets/workflow-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/KonstantinKai/unau/main/assets/workflow-dark.png">
   <img alt="Who does what: you read the diff, stage what is right and mark what is wrong; unau writes each mark to the review file and runs your agent on it; the agent works each item from [~] to [x]; unau picks up the ticks and shows each one against the code now; you accept or push back until nothing is open or unstaged." src="https://raw.githubusercontent.com/KonstantinKai/unau/main/assets/workflow-light.png">
 </picture>
+</a>
 
 1. **Review.** Walk the diff. Stage what is right (`s` lines or hunks, `gs` a
    whole file); staged means accepted, so it never reaches the agent.
