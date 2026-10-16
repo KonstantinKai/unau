@@ -28,7 +28,7 @@ const TICK: Duration = Duration::from_millis(250);
 
 fn main() {
     if let Err(err) = start() {
-        eprintln!("revmark: {err:#}");
+        eprintln!("unau: {err:#}");
         std::process::exit(1);
     }
 }
@@ -42,8 +42,7 @@ fn start() -> Result<()> {
     let stdout = args.stdout()?;
     let cwd = std::env::current_dir()?;
     let user_config = cli::user_config();
-    let load_config =
-        |root: &Path| Config::load(user_config.as_deref(), &root.join(".revmark.toml"));
+    let load_config = |root: &Path| Config::load(user_config.as_deref(), &root.join(".unau.toml"));
     let newest = if args.resume {
         let repo = git::Repo::discover(&cwd)?;
         review::latest(&load_config(&repo.root)?.review_dir(&repo.root))
@@ -86,7 +85,12 @@ fn start() -> Result<()> {
     let snap = snapshot(&repo, &target)?;
     let dark = dark_background();
     let theme = config.theme(dark);
-    let config_files = app::ConfigFiles::new(cli::user_config(), &repo.root, dark);
+    let config_files = app::ConfigFiles::new(
+        cli::user_config(),
+        &repo.root,
+        config.instructions_file(&repo.root),
+        dark,
+    );
     let mut state = AppState::new(repo, target, snap, config, review, store);
     state.multiplexers = run::Multiplexers::detect();
     state.layout.theme = theme;
@@ -116,7 +120,7 @@ fn start() -> Result<()> {
     if let Some(path) = &session_path
         && let Err(err) = session::save(path, &state.session())
     {
-        eprintln!("revmark: session not saved: {err:#}");
+        eprintln!("unau: session not saved: {err:#}");
     }
     if let Some(text) = matches!(state.store, Store::Stdout)
         .then(|| state.final_review())

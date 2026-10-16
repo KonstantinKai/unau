@@ -3,8 +3,7 @@
 
 use super::{AppState, Effect};
 use crate::{
-    config::{Config, template},
-    git::REVIEW_DIR,
+    config::{Config, INSTRUCTIONS_FILE, template},
     review::DEFAULT_INSTRUCTIONS,
 };
 use std::{
@@ -12,9 +11,6 @@ use std::{
     path::{Path, PathBuf},
     time::SystemTime,
 };
-
-/// Name of an instructions file, globally and in a repository's `.revmark/`.
-pub const INSTRUCTIONS_FILE: &str = "instructions.md";
 
 /// A line that pulls in the instructions of the next level down.
 pub const INHERIT_MARKER: &str = "{inherit}";
@@ -45,11 +41,12 @@ fn resolve_inherit(levels: &[&str]) -> String {
 pub struct ConfigFiles {
     /// `config.toml` in the user's config directory, when there is one.
     pub user: Option<PathBuf>,
-    /// `.revmark.toml` in the repository.
+    /// `.unau.toml` in the repository.
     pub repo: PathBuf,
     /// `instructions.md` next to the user config: every workspace.
     pub instructions_global: Option<PathBuf>,
-    /// `.revmark/instructions.md` in the repository: replaces the global one.
+    /// The repository's instructions (`[review] instructions`, else
+    /// `instructions.md` in the review folder): replaces the global one.
     pub instructions_repo: PathBuf,
     /// Modification times of the config files, then the instruction files.
     pub seen: [Option<SystemTime>; 4],
@@ -61,15 +58,20 @@ pub struct ConfigFiles {
 }
 
 impl ConfigFiles {
-    pub fn new(user: Option<PathBuf>, repo_root: &Path, dark_background: bool) -> Self {
+    pub fn new(
+        user: Option<PathBuf>,
+        repo_root: &Path,
+        instructions_repo: PathBuf,
+        dark_background: bool,
+    ) -> Self {
         let mut files = Self {
             instructions_global: user
                 .as_deref()
                 .and_then(Path::parent)
                 .map(|dir| dir.join(INSTRUCTIONS_FILE)),
             user,
-            repo: repo_root.join(".revmark.toml"),
-            instructions_repo: repo_root.join(REVIEW_DIR).join(INSTRUCTIONS_FILE),
+            repo: repo_root.join(".unau.toml"),
+            instructions_repo,
             seen: [None; 4],
             texts: Default::default(),
             dark_background,
@@ -186,7 +188,7 @@ impl AppState {
 
     /// Reloads whichever of config and instructions changed in content since
     /// last read; true when either did.
-    fn reload_changed(&mut self) -> bool {
+    pub(super) fn reload_changed(&mut self) -> bool {
         let (config, instructions) = self.config_files.mark_seen();
         if config {
             self.reload_config();
@@ -234,9 +236,15 @@ impl AppState {
                 self.layout.theme = config.theme(files.dark_background);
                 // Cached files are highlighted in the old theme.
                 self.file_cache.clear();
+                let instructions = config.instructions_file(&self.repo.root);
                 self.config = config;
                 self.reload_file();
                 self.info("config reloaded");
+                if instructions != self.config_files.instructions_repo {
+                    self.config_files.instructions_repo = instructions;
+                    self.config_files.mark_seen();
+                    self.reload_instructions();
+                }
             }
             Err(err) => self.error(format!("config not applied: {err:#}")),
         }
@@ -262,8 +270,13 @@ mod tests {
     fn with_user_config(f: &Fixture) -> (AppState, PathBuf) {
         let mut s = state(f);
         let dir = f.path().join("home-config");
-        let user = dir.join("revmark/config.toml");
-        s.config_files = ConfigFiles::new(Some(user.clone()), f.path(), true);
+        let user = dir.join("unau/config.toml");
+        s.config_files = ConfigFiles::new(
+            Some(user.clone()),
+            f.path(),
+            s.config.instructions_file(f.path()),
+            true,
+        );
         (s, user)
     }
 
@@ -383,13 +396,10 @@ mod tests {
             "Global rules.\n",
         )
         .unwrap();
-        f.write(".revmark/instructions.md", "{inherit}\n- Run pnpm test.\n");
+        f.write(".unau/instructions.md", "{inherit}\n- Run pnpm test.\n");
         let (text, source) = s.config_files.instructions();
         assert_eq!(text, "Global rules.\n- Run pnpm test.");
-        assert_eq!(
-            source,
-            Some(f.path().join(".revmark").join(INSTRUCTIONS_FILE))
-        );
+        assert_eq!(source, Some(f.path().join(".unau").join(INSTRUCTIONS_FILE)));
         assert!(!text.contains(INHERIT_MARKER));
     }
 
@@ -404,11 +414,33 @@ mod tests {
         )
         .unwrap();
         assert_eq!(s.config_files.instructions().0, "Global rules.");
-        f.write(".revmark/instructions.md", "Run pnpm test.\n");
+        f.write(".unau/instructions.md", "Run pnpm test.\n");
         assert_eq!(s.config_files.instructions().0, "Run pnpm test.");
         assert_eq!(
             press(&mut s, "i"),
-            Effect::EditFile(f.path().join(".revmark").join(INSTRUCTIONS_FILE))
+            Effect::EditFile(f.path().join(".unau").join(INSTRUCTIONS_FILE))
+        );
+    }
+
+    #[test]
+    fn the_repository_file_moves_with_the_review_dir_and_the_instructions_setting() {
+        let f = repo();
+        let (mut s, _) = with_user_config(&f);
+        f.write("ai/unau/instructions.md", "From the review dir.\n");
+        f.write("AGENTS-REVIEW.md", "From the setting.\n");
+        f.write(".unau.toml", "[review]\ndir = \"ai/unau\"\n");
+        assert!(s.poll_config());
+        assert_eq!(s.review.instructions, "From the review dir.");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        f.write(
+            ".unau.toml",
+            "[review]\ndir = \"ai/unau\"\ninstructions = \"AGENTS-REVIEW.md\"\n",
+        );
+        assert!(s.poll_config());
+        assert_eq!(s.review.instructions, "From the setting.");
+        assert_eq!(
+            press(&mut s, "i"),
+            Effect::EditFile(f.path().join("AGENTS-REVIEW.md"))
         );
     }
 
@@ -416,7 +448,7 @@ mod tests {
     fn a_written_review_keeps_its_instructions_and_a_new_one_takes_the_file() {
         let f = repo();
         let (mut s, _) = with_user_config(&f);
-        f.write(".revmark/instructions.md", "First rules.\n");
+        f.write(".unau/instructions.md", "First rules.\n");
         assert!(s.poll_config());
         assert_eq!(s.review.instructions, "First rules.");
         assert!(
@@ -435,7 +467,7 @@ mod tests {
         );
         // Make sure the change is seen as a change even on coarse clocks.
         std::thread::sleep(std::time::Duration::from_millis(20));
-        f.write(".revmark/instructions.md", "Second rules.\n");
+        f.write(".unau/instructions.md", "Second rules.\n");
         assert!(s.poll_config());
         assert_eq!(s.review.instructions, "First rules.");
         assert!(s.message.as_ref().unwrap().text.contains("next review"));

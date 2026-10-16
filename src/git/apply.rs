@@ -70,6 +70,43 @@ pub fn build_patch(
     Some(text)
 }
 
+/// Paths passed to one `git` call; a folder with thousands of files is split
+/// into several calls rather than hitting the command-line length limit.
+const PATHS_PER_CALL: usize = 500;
+
+/// Applies `change` to every change in each of `files` (path, untracked),
+/// with one `git` call per kind rather than one patch per file.
+pub fn apply_files(repo: &Repo, change: Change, files: &[(&str, bool)]) -> Result<()> {
+    let run_all = |args: &[&str], paths: &[&str]| -> Result<()> {
+        for chunk in paths.chunks(PATHS_PER_CALL) {
+            let mut call = args.to_vec();
+            call.push("--");
+            call.extend(chunk);
+            repo.run(&call)?;
+        }
+        Ok(())
+    };
+    let paths: Vec<&str> = files.iter().map(|(p, _)| *p).collect();
+    match change {
+        Change::Stage => run_all(&["add", "-A"], &paths),
+        // Before the first commit there is no HEAD to reset the index to.
+        Change::Unstage if repo.commit("HEAD").is_err() => {
+            run_all(&["rm", "--cached", "-r", "-q", "--ignore-unmatch"], &paths)
+        }
+        Change::Unstage => run_all(&["reset", "-q"], &paths),
+        Change::Discard => {
+            let tracked: Vec<&str> = files.iter().filter(|f| !f.1).map(|f| f.0).collect();
+            if !tracked.is_empty() {
+                run_all(&["checkout", "-q"], &tracked)?;
+            }
+            for (path, _) in files.iter().filter(|f| f.1) {
+                std::fs::remove_file(repo.root.join(path))?;
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Applies `change` to the selected lines of one section of one file.
 /// `selected[i]` says whether `diff.lines[i]` is part of the change.
 pub fn apply(
@@ -141,6 +178,39 @@ mod tests {
             .iter()
             .map(|l| l.is_change() && texts.contains(&l.text.as_str()))
             .collect()
+    }
+
+    #[test]
+    fn whole_files_stage_unstage_and_discard_in_one_call_each() {
+        let f = Fixture::new();
+        f.write("kept.txt", "one\n");
+        f.write("gone.txt", "bye\n");
+        f.commit_all("init");
+        f.write("kept.txt", "two\n");
+        std::fs::remove_file(f.path().join("gone.txt")).unwrap();
+        f.write("new.txt", "hi\n");
+        let all = [("kept.txt", false), ("gone.txt", false), ("new.txt", true)];
+        apply_files(&f.repo, Change::Stage, &all).unwrap();
+        assert_eq!(
+            f.git(&["diff", "--cached", "--name-status"]),
+            "D\tgone.txt\nM\tkept.txt\nA\tnew.txt\n"
+        );
+        apply_files(&f.repo, Change::Unstage, &all).unwrap();
+        assert!(f.git(&["diff", "--cached"]).is_empty());
+        apply_files(&f.repo, Change::Discard, &all).unwrap();
+        assert_eq!(f.read("kept.txt"), "one\n");
+        assert_eq!(f.read("gone.txt"), "bye\n");
+        assert!(!f.path().join("new.txt").exists());
+    }
+
+    #[test]
+    fn unstaging_whole_files_works_before_the_first_commit() {
+        let f = Fixture::new();
+        f.write("a.txt", "one\n");
+        f.git(&["add", "a.txt"]);
+        apply_files(&f.repo, Change::Unstage, &[("a.txt", false)]).unwrap();
+        assert!(f.git(&["ls-files"]).is_empty());
+        assert!(f.path().join("a.txt").exists());
     }
 
     #[test]

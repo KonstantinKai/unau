@@ -30,10 +30,9 @@ impl Scroll {
 }
 
 /// New viewport top and cursor position after scrolling, in visual lines.
-/// Shared with the comments pane, whose rows are one line each.
 /// `starts[r]` is where row `r` begins and `starts[rows]` is the total; rows
 /// for which `selectable` is false never hold the cursor.
-pub(super) fn scrolled(
+fn scrolled(
     starts: &[usize],
     selectable: impl Fn(usize) -> bool,
     (top, cursor): (usize, usize),
@@ -86,48 +85,28 @@ pub(super) fn scrolled(
 
 impl AppState {
     /// `C-e`, `C-y`, `C-d`, `C-u`, `C-f`, `C-b` in whichever pane has focus.
+    /// The scroll keys move the diff from the files and comments panes too,
+    /// so a file can be read without leaving the list it was picked from.
+    /// The run pane keeps them: they are how its output is paged.
     pub fn scroll(&mut self, by: Scroll, down: bool) {
-        match self.focus {
-            Pane::Tree => {
-                let height = self.tree_height();
-                let starts: Vec<usize> = (0..=self.tree.len()).collect();
-                let (top, cursor) = scrolled(
-                    &starts,
-                    |_| true,
-                    (self.tree_scroll, self.tree_cursor),
-                    height,
-                    by.lines(height),
-                    down,
-                    by.moves_cursor(),
-                );
-                self.tree_scroll = top;
-                self.tree_cursor = cursor;
-                self.open_under_cursor();
-            }
-            Pane::Diff => {
-                let (_, height) = self.diff_size();
-                if let Some(file) = &mut self.file {
-                    let (top, cursor) = scrolled(
-                        &file.view.starts,
-                        |r| file.selectable(r),
-                        (file.scroll, file.cursor),
-                        height,
-                        by.lines(height),
-                        down,
-                        by.moves_cursor(),
-                    );
-                    file.scroll = top;
-                    file.cursor = cursor;
-                }
-            }
-            Pane::Comments => {
-                let height = self.comments_height();
-                self.comments_scroll(height, by.lines(height), down, by.moves_cursor());
-            }
-            Pane::Run => {
-                let lines = by.lines(self.run_view_size().1).cast_signed();
-                self.run_scroll_by(if down { lines } else { -lines });
-            }
+        if self.focus == Pane::Run {
+            let lines = by.lines(self.run_view_size().1).cast_signed();
+            self.run_scroll_by(if down { lines } else { -lines });
+            return;
+        }
+        let (_, height) = self.diff_size();
+        if let Some(file) = &mut self.file {
+            let (top, cursor) = scrolled(
+                &file.view.starts,
+                |r| file.selectable(r),
+                (file.scroll, file.cursor),
+                height,
+                by.lines(height),
+                down,
+                by.moves_cursor(),
+            );
+            file.scroll = top;
+            file.cursor = cursor;
         }
         self.scroll_to_cursor();
     }
@@ -371,41 +350,48 @@ mod tests {
     }
 
     #[test]
-    fn scroll_keys_work_in_both_panes() {
+    fn scroll_keys_move_the_diff_from_any_pane_but_the_run_pane() {
         let f = Fixture::new();
         for i in 0..60 {
             f.write(&format!("f{i:02}.txt"), "a\n");
         }
-        f.write("long.txt", &crate::git::fixture::numbered(400));
+        f.write("a-long.txt", &crate::git::fixture::numbered(400));
         f.commit_all("init");
         for i in 0..60 {
             f.write(&format!("f{i:02}.txt"), "b\n");
         }
         f.write(
-            "long.txt",
+            "a-long.txt",
             &crate::git::fixture::numbered(400).replace("line ", "row "),
         );
         let mut s = state(&f);
-        let height = s.tree_height();
-        ctrl(&mut s, 'd');
-        assert_eq!(s.tree_cursor, height / 2);
-        assert_eq!(
-            s.file.as_ref().unwrap().path(),
-            Some(format!("f{:02}.txt", height / 2).as_str())
-        );
-        ctrl(&mut s, 'e');
-        assert_eq!(s.tree_scroll, height / 2 + 1);
-        s.tree_cursor = s.tree.len() - 1;
-        s.open_under_cursor();
-        s.focus = Pane::Diff;
+        s.focus = Pane::Tree;
         let (_, height) = s.diff_size();
-        let before = s.file.as_ref().unwrap().cursor;
+        let (tree_cursor, tree_scroll) = (s.tree_cursor, s.tree_scroll);
         ctrl(&mut s, 'f');
-        let file = s.file.as_ref().unwrap();
-        assert_eq!(file.scroll, height - 2);
-        assert!(file.cursor > before);
+        assert_eq!(s.file.as_ref().unwrap().scroll, height - 2);
+        assert_eq!((s.tree_cursor, s.tree_scroll), (tree_cursor, tree_scroll));
+        assert_eq!(s.focus, Pane::Tree);
+        ctrl(&mut s, 'e');
+        assert_eq!(s.file.as_ref().unwrap().scroll, height - 1);
+        s.focus = Pane::Diff;
         ctrl(&mut s, 'b');
-        assert_eq!(s.file.as_ref().unwrap().scroll, 0);
+        assert_eq!(s.file.as_ref().unwrap().scroll, 1);
+        s.handle_key(Key {
+            code: KeyCodeKey::Char('G'),
+            ctrl: false,
+        });
+        s.focus = Pane::Tree;
+        s.handle_key(Key {
+            code: KeyCodeKey::Char('G'),
+            ctrl: false,
+        });
+        assert_eq!(s.tree_cursor, s.tree.len() - 1);
+        s.run_started("agent");
+        s.focus = Pane::Run;
+        let scroll = s.file.as_ref().unwrap().scroll;
+        ctrl(&mut s, 'u');
+        assert_eq!(s.file.as_ref().unwrap().scroll, scroll);
     }
 
     fn long_change() -> Fixture {

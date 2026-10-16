@@ -9,7 +9,7 @@
 use super::{SectionView, embedded};
 use crate::{
     git::{Line, LineKind, Section},
-    theme::{LATTE_TMTHEME, MACCHIATO_TMTHEME, Syntax},
+    theme::{LATTE_TMTHEME, MACCHIATO_TMTHEME, Syntax, Vendored},
 };
 use ratatui::style::Color;
 use std::{collections::HashMap, io::Cursor, ops::Range, path::Path, sync::LazyLock};
@@ -24,6 +24,21 @@ static SYNTAXES: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_new
 static THEMES: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
 static MACCHIATO: LazyLock<Option<Theme>> = LazyLock::new(|| load(MACCHIATO_TMTHEME));
 static LATTE: LazyLock<Option<Theme>> = LazyLock::new(|| load(LATTE_TMTHEME));
+/// bat's syntax themes, as two-face embeds them.
+static EMBEDDED: LazyLock<two_face::theme::EmbeddedLazyThemeSet> =
+    LazyLock::new(two_face::theme::extra);
+/// Bundled `.tmTheme` files, each parsed once on first use.
+static VENDORED: LazyLock<Vec<(Vendored, Option<Theme>)>> = LazyLock::new(|| {
+    [
+        Vendored::TokyoNightNight,
+        Vendored::TokyoNightDay,
+        Vendored::RosePineMain,
+        Vendored::RosePineDawn,
+    ]
+    .into_iter()
+    .map(|file| (file, load(file.tm_theme())))
+    .collect()
+});
 
 /// Syntect theme used when a bundled one fails to load.
 const FALLBACK: &str = "base16-ocean.dark";
@@ -42,6 +57,11 @@ pub fn syntax_theme(syntax: &Syntax) -> &Theme {
         Syntax::CatppuccinMacchiato => MACCHIATO.as_ref(),
         Syntax::CatppuccinLatte => LATTE.as_ref(),
         Syntax::Builtin(name) => THEMES.themes.get(name.as_ref()),
+        Syntax::Embedded(name) => Some(EMBEDDED.get(*name)),
+        Syntax::Vendored(file) => VENDORED
+            .iter()
+            .find(|(f, _)| f == file)
+            .and_then(|(_, theme)| theme.as_ref()),
         Syntax::Loaded(theme) => Some(theme.as_ref()),
     };
     found.unwrap_or(&THEMES.themes[FALLBACK])
@@ -410,6 +430,14 @@ mod tests {
         for theme in crate::theme::BUILTIN {
             let _ = syntax_theme(&theme.syntax);
         }
+        // Every bundled file parses, so none falls back to the stand-in.
+        assert!(VENDORED.iter().all(|(_, theme)| theme.is_some()));
+        assert_eq!(
+            syntax_theme(&Syntax::Vendored(Vendored::RosePineDawn))
+                .name
+                .as_deref(),
+            Some("Rosé Pine Dawn")
+        );
         assert_eq!(
             syntax_theme(&Syntax::Builtin("no-such-theme".into())).name,
             THEMES.themes[FALLBACK].name

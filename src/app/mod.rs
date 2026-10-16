@@ -4,11 +4,13 @@
 mod annotate;
 mod comments;
 mod files;
+mod filter;
 mod folding;
 mod input;
 mod navigate;
 mod open;
 mod persist;
+mod picker;
 mod rereview;
 mod resume;
 mod runlog;
@@ -17,7 +19,9 @@ mod stage;
 
 pub use comments::{CommentRow, CommentsPane, label as comment_label};
 pub use files::{FileState, NoteLine, NoteStyle, Source, code_widths};
+pub use filter::FileFilter;
 pub use persist::{Store, open as persist_open};
+pub use picker::ThemePicker;
 pub use runlog::{RunLog, RunStatus, follow_top, format_elapsed};
 pub use settings::ConfigFiles;
 
@@ -202,6 +206,12 @@ pub struct AppState {
     pub run_log: Option<RunLog>,
     /// The comments pane under the files pane.
     pub comments: CommentsPane,
+    /// The theme picker, while it is open.
+    pub theme_picker: Option<ThemePicker>,
+    /// What narrows the files pane.
+    pub filter: FileFilter,
+    /// Paths before the filter, for the `shown/all` count.
+    pub all_paths: usize,
 }
 
 impl AppState {
@@ -242,6 +252,9 @@ impl AppState {
             config_files: ConfigFiles::default(),
             run_log: None,
             comments: CommentsPane::default(),
+            theme_picker: None,
+            filter: FileFilter::default(),
+            all_paths: 0,
         };
         state.check_blobs();
         state.rebuild_tree();
@@ -301,6 +314,11 @@ impl AppState {
             {
                 paths.push(path.to_owned());
             }
+        }
+        self.all_paths = paths.len();
+        let needle = self.filter.text.to_lowercase();
+        if !needle.is_empty() {
+            paths.retain(|p| p.to_lowercase().contains(&needle));
         }
         let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
         self.tree = tree::build(&refs, &self.folded, self.flat);
@@ -403,7 +421,7 @@ pub mod tests {
     use super::*;
     use crate::git::fixture::Fixture;
 
-    /// A state over a fixture repository, with a review written to `.revmark/`.
+    /// A state over a fixture repository, with a review written to `.unau/`.
     pub fn state(f: &Fixture) -> AppState {
         let target = Target::WorkTree;
         let snap = snapshot(&f.repo, &target).unwrap();

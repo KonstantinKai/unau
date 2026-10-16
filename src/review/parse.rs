@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn old_instruction_paragraphs_are_read_and_rewritten_as_a_block() {
-        let old = "---\ntool: revmark 0.1.0\nstatus: open\nbase: HEAD\nfiles:\n---\n\n# Review 2026-10-14-00\n\nAgent instructions: work through unchecked items, mark `[x]` when the change is\nmade and tests pass.\n\n## General\n\n- [ ] fix: one\n";
+        let old = "---\ntool: unau 0.1.0\nstatus: open\nbase: HEAD\nfiles:\n---\n\n# Review 2026-10-14-00\n\nAgent instructions: work through unchecked items, mark `[x]` when the change is\nmade and tests pass.\n\n## General\n\n- [ ] fix: one\n";
         let review = parse(old).unwrap();
         assert_eq!(
             review.instructions,

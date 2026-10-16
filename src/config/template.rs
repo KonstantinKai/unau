@@ -9,8 +9,8 @@ use std::fmt::Write as _;
 pub fn template() -> String {
     let defaults = Config::default();
     let mut text = String::from(
-        "# revmark configuration. Every setting is listed at its default, commented out.\n\
-         # Uncomment what you want to change; revmark picks the file up when it is saved.\n\
+        "# unau configuration. Every setting is listed at its default, commented out.\n\
+         # Uncomment what you want to change; unau picks the file up when it is saved.\n\
          \n[keys]\n",
     );
     for action in Action::ALL {
@@ -33,6 +33,7 @@ pub fn template() -> String {
          \n[ui]\n\
          # line_numbers = \"both\"          # both | new\n\
          # confirm_quit = true             # Q asks before quitting\n\
+         # background = \"theme\"           # theme | terminal (keep the terminal's, transparency included)\n\
          \n[review]\n",
     );
     let _ = writeln!(
@@ -40,7 +41,10 @@ pub fn template() -> String {
         "# quote_lines = {DEFAULT_QUOTE_LINES}               # longer quotes keep their first & last lines; 0 = never cap"
     );
     text.push_str(
-        "# dir = \".revmark\"               # where reviews go: relative to the repo, ~/…, or absolute; {repo} = repo folder name\n",
+        "# dir = \".unau\"               # where reviews go: relative to the repo, ~/…, or absolute; {repo} = repo folder name\n",
+    );
+    text.push_str(
+        "# instructions = \".unau/instructions.md\"  # the repo's agent instructions file; default: instructions.md in dir\n",
     );
     text.push_str("\n[theme]\n# mode = \"auto\"                  # auto | light | dark\n");
     let _ = writeln!(text, "# dark = \"{}\"", defaults.dark_name);

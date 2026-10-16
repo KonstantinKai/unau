@@ -1,4 +1,4 @@
-//! `config.toml` (user) and `.revmark.toml` (repository): key bindings, the
+//! `config.toml` (user) and `.unau.toml` (repository): key bindings, the
 //! run command, theme, gutter and quote length.
 
 mod keys;
@@ -16,22 +16,28 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// `[review] dir` for the repository at `root`: `{repo}` is its folder name,
-/// a leading `~/` is `home`, and a relative path starts at `root`. Unset is
-/// `<root>/.revmark`.
+/// Name of an instructions file, globally and in a repository's review folder.
+pub const INSTRUCTIONS_FILE: &str = "instructions.md";
+
+/// `[review] dir` for the repository at `root`. Unset is `<root>/.unau`.
 fn resolve_review_dir(dir: Option<&str>, root: &Path, home: Option<&Path>) -> PathBuf {
-    let Some(dir) = dir.map(str::trim).filter(|d| !d.is_empty()) else {
-        return root.join(crate::git::REVIEW_DIR);
-    };
+    resolve_path(dir, root, home).unwrap_or_else(|| root.join(crate::git::REVIEW_DIR))
+}
+
+/// A path from the `[review]` section, for the repository at `root`: `{repo}`
+/// is its folder name, a leading `~/` is `home`, and a relative path starts at
+/// `root`. `None` when unset or blank.
+fn resolve_path(path: Option<&str>, root: &Path, home: Option<&Path>) -> Option<PathBuf> {
+    let dir = path.map(str::trim).filter(|d| !d.is_empty())?;
     let name = root
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let dir = dir.replace("{repo}", &name);
-    match (dir.strip_prefix("~/"), home) {
+    Some(match (dir.strip_prefix("~/"), home) {
         (Some(rest), Some(home)) => home.join(rest),
         _ => root.join(dir),
-    }
+    })
 }
 
 /// Where `r` runs the command: picked from the environment, or forced.
@@ -43,7 +49,7 @@ pub enum RunIn {
     Auto,
     Herdr,
     Tmux,
-    /// In the background, output in a pane inside revmark.
+    /// In the background, output in a pane inside unau.
     Pane,
     Foreground,
 }
@@ -70,6 +76,17 @@ pub enum ThemeMode {
     Dark,
 }
 
+/// Who paints behind the text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Background {
+    /// The theme's own `background`, so any theme reads right on any terminal.
+    #[default]
+    Theme,
+    /// The terminal's, transparency included.
+    Terminal,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LineNumbers {
@@ -89,10 +106,14 @@ pub struct Config {
     pub line_numbers: LineNumbers,
     /// Quotes longer than this keep only their first and last lines; 0 = all.
     pub quote_lines: usize,
-    /// `[review] dir` as written; `None` keeps reviews in `<repo>/.revmark`.
+    /// `[review] dir` as written; `None` keeps reviews in `<repo>/.unau`.
     pub review_dir: Option<String>,
+    /// `[review] instructions` as written; `None` reads `instructions.md` in
+    /// the review folder.
+    pub instructions: Option<String>,
     /// `Q` asks before quitting.
     pub confirm_quit: bool,
+    pub background: Background,
     pub theme_mode: ThemeMode,
     /// Theme names as configured; a user theme may replace a built-in one.
     pub dark_name: String,
@@ -150,6 +171,7 @@ struct RunSection {
 struct UiSection {
     line_numbers: Option<LineNumbers>,
     confirm_quit: Option<bool>,
+    background: Option<Background>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -157,6 +179,7 @@ struct UiSection {
 struct ReviewSection {
     quote_lines: Option<usize>,
     dir: Option<String>,
+    instructions: Option<String>,
 }
 
 impl Default for Config {
@@ -175,7 +198,9 @@ impl Default for Config {
             line_numbers: LineNumbers::Both,
             quote_lines: crate::review::DEFAULT_QUOTE_LINES,
             review_dir: None,
+            instructions: None,
             confirm_quit: true,
+            background: Background::Theme,
             theme_mode: ThemeMode::Auto,
             dark_name: theme::CATPPUCCIN_MACCHIATO.name.into_owned(),
             light_name: theme::CATPPUCCIN_LATTE.name.into_owned(),
@@ -249,11 +274,17 @@ impl Config {
         if let Some(numbers) = file.ui.line_numbers {
             self.line_numbers = numbers;
         }
+        if let Some(background) = file.ui.background {
+            self.background = background;
+        }
         if let Some(confirm) = file.ui.confirm_quit {
             self.confirm_quit = confirm;
         }
         if let Some(dir) = file.review.dir {
             self.review_dir = Some(dir);
+        }
+        if let Some(path) = file.review.instructions {
+            self.instructions = Some(path);
         }
         if let Some(lines) = file.review.quote_lines {
             self.quote_lines = lines;
@@ -318,6 +349,14 @@ impl Config {
     pub fn review_dir(&self, root: &Path) -> PathBuf {
         let home = std::env::var_os("HOME").map(PathBuf::from);
         resolve_review_dir(self.review_dir.as_deref(), root, home.as_deref())
+    }
+
+    /// The repository's instructions file: `[review] instructions`, else
+    /// `instructions.md` in the review folder.
+    pub fn instructions_file(&self, root: &Path) -> PathBuf {
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        resolve_path(self.instructions.as_deref(), root, home.as_deref())
+            .unwrap_or_else(|| self.review_dir(root).join(INSTRUCTIONS_FILE))
     }
 
     /// Keys bound to `action`, for help and messages.
@@ -420,12 +459,12 @@ mod tests {
     }
 
     #[test]
-    fn the_review_dir_defaults_to_dot_revmark_and_resolves_home_repo_and_relative() {
+    fn the_review_dir_defaults_to_dot_unau_and_resolves_home_repo_and_relative() {
         let root = Path::new("/work/slider");
         let home = Some(Path::new("/home/me"));
         let at = |dir| resolve_review_dir(dir, root, home);
-        assert_eq!(at(None), Path::new("/work/slider/.revmark"));
-        assert_eq!(at(Some("  ")), Path::new("/work/slider/.revmark"));
+        assert_eq!(at(None), Path::new("/work/slider/.unau"));
+        assert_eq!(at(Some("  ")), Path::new("/work/slider/.unau"));
         assert_eq!(
             at(Some("docs/reviews")),
             Path::new("/work/slider/docs/reviews")
@@ -441,13 +480,35 @@ mod tests {
     }
 
     #[test]
+    fn the_instructions_file_follows_the_review_dir_unless_set() {
+        let root = Path::new("/work/slider");
+        let mut config = Config::default();
+        assert_eq!(
+            config.instructions_file(root),
+            Path::new("/work/slider/.unau/instructions.md")
+        );
+        config.merge("[review]\ndir = \"ai/unau\"\n").unwrap();
+        assert_eq!(
+            config.instructions_file(root),
+            Path::new("/work/slider/ai/unau/instructions.md")
+        );
+        config
+            .merge("[review]\ninstructions = \"docs/{repo}-agents.md\"\n")
+            .unwrap();
+        assert_eq!(
+            config.instructions_file(root),
+            Path::new("/work/slider/docs/slider-agents.md")
+        );
+    }
+
+    #[test]
     fn bad_theme_settings_fail_naming_the_culprit() {
         for (text, culprit) in [
             (
                 "[theme]\ndark = \"catppuccin.espresso\"\n",
                 "catppuccin.espresso",
             ),
-            ("[theme.colors]\nbackground = \"#000000\"\n", "background"),
+            ("[theme.colors]\nsidebar = \"#000000\"\n", "sidebar"),
             ("[theme.colors]\ntext = \"blue\"\n", "blue"),
             ("[ui]\ntheme = \"dark\"\n", "theme"),
         ] {

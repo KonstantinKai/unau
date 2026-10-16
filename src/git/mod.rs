@@ -4,7 +4,7 @@ mod apply;
 mod parse;
 mod snapshot;
 
-pub use apply::{Change, apply};
+pub use apply::{Change, apply, apply_files};
 pub use parse::{FileDiff, Line, LineKind, parse};
 pub use snapshot::{FileStatus, Section, SectionKind, Snapshot, snapshot};
 
@@ -16,11 +16,7 @@ use std::{
 };
 
 /// Directory the review files live in, relative to the repository root.
-pub const REVIEW_DIR: &str = ".revmark";
-
-/// Where reviews lived before `.revmark/`. Still kept out of the diff, so an
-/// old folder never shows up as a change to review.
-pub const LEGACY_REVIEW_DIR: &str = ".review";
+pub const REVIEW_DIR: &str = ".unau";
 
 /// The SHA-1 of git's empty tree, used as the parent of a root commit.
 const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -61,7 +57,7 @@ impl Target {
 #[derive(Clone, Debug)]
 pub struct Repo {
     pub root: PathBuf,
-    /// Where review files go: `<root>/.revmark` unless configured.
+    /// Where review files go: `<root>/.unau` unless configured.
     pub reviews: PathBuf,
 }
 

@@ -8,7 +8,7 @@ use std::{fs, path::PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Store {
-    /// `.revmark/<name>.md`. `path` is `None` until the first annotation;
+    /// `.unau/<name>.md`. `path` is `None` until the first annotation;
     /// `synced` is the file's text as last written or read.
     File {
         path: Option<PathBuf>,

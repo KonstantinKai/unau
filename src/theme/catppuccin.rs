@@ -1,34 +1,11 @@
 //! Catppuccin Macchiato and Latte, from the official palette, with colours
 //! placed the way Catppuccin's style guide places them.
 
-use super::{Colors, Syntax, Theme, blend, hex};
-use ratatui::style::Color;
+use super::{
+    Syntax, Theme, hex,
+    palette::{Palette, colors},
+};
 use std::borrow::Cow;
-
-/// Opacity of diff tints and the selection band, within the style guide's
-/// recommended 15 to 30 percent.
-const TINT_PERCENT: u16 = 20;
-const SELECTION_PERCENT: u16 = 25;
-
-/// The palette colours revmark uses; the rest of the 26 have no slot.
-struct Palette {
-    mauve: Color,
-    red: Color,
-    peach: Color,
-    yellow: Color,
-    green: Color,
-    teal: Color,
-    blue: Color,
-    lavender: Color,
-    text: Color,
-    subtext0: Color,
-    overlay2: Color,
-    overlay1: Color,
-    overlay0: Color,
-    surface1: Color,
-    base: Color,
-    mantle: Color,
-}
 
 const MACCHIATO_PALETTE: Palette = Palette {
     mauve: hex(0xc6a0f6),
@@ -68,31 +45,6 @@ const LATTE_PALETTE: Palette = Palette {
     mantle: hex(0xe6e9ef),
 };
 
-const fn colors(p: &Palette) -> Colors {
-    Colors {
-        text: p.text,
-        muted: p.overlay1,
-        subtle: p.subtext0,
-        border_active: p.lavender,
-        border_inactive: p.overlay0,
-        cursor_bg: p.surface1,
-        selection_bg: blend(p.overlay2, p.base, SELECTION_PERCENT),
-        note_bg: p.mantle,
-        added: p.green,
-        removed: p.red,
-        added_bg: blend(p.green, p.base, TINT_PERCENT),
-        removed_bg: blend(p.red, p.base, TINT_PERCENT),
-        hunk: p.peach,
-        fix: p.yellow,
-        question: p.blue,
-        suggestion: p.mauve,
-        done: p.green,
-        error: p.red,
-        warning: p.yellow,
-        info: p.teal,
-    }
-}
-
 pub const MACCHIATO: Theme = Theme {
     name: Cow::Borrowed("catppuccin.macchiato"),
     colors: colors(&MACCHIATO_PALETTE),
@@ -114,6 +66,7 @@ pub const LATTE_TMTHEME: &[u8] = include_bytes!("../../assets/themes/catppuccin-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::theme::blend;
 
     #[test]
     fn tints_are_blended_over_the_base_colour() {

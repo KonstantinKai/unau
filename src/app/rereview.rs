@@ -6,6 +6,7 @@ use crate::{
     git::{Change, FileDiff, LineKind, SectionKind, apply},
     review::{Item, Scope},
 };
+use std::collections::HashMap;
 
 /// New-side lines `start..=end`, one-based.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -89,20 +90,27 @@ pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Optio
 
 /// New-side lines touched by the changes of `diff`, sorted.
 pub fn changed_lines(diff: &FileDiff) -> Vec<usize> {
+    let touched = touched_new(diff);
     let mut lines: Vec<usize> = (0..diff.lines.len())
         .filter(|i| diff.lines[*i].is_change())
-        .map(|i| touched_new(diff, i))
+        .map(|i| touched[i])
         .collect();
     lines.dedup();
     lines
 }
 
-/// The working-tree line that index line `line` became, given the unstaged
-/// diff (index → working tree, whole file as context). A line the working
-/// tree removed maps to the line that now sits in its place.
-pub fn index_to_worktree(unstaged: &FileDiff, line: usize) -> Option<usize> {
-    let at = unstaged.lines.iter().position(|l| l.old == Some(line))?;
-    Some(touched_new(unstaged, at))
+/// Maps index lines to the working-tree lines they became, given the
+/// unstaged diff (index → working tree, whole file as context). A line the
+/// working tree removed maps to the line that now sits in its place.
+pub fn index_to_worktree(unstaged: &FileDiff) -> impl Fn(usize) -> Option<usize> {
+    let touched = touched_new(unstaged);
+    let mut by_old = HashMap::new();
+    for (i, line) in unstaged.lines.iter().enumerate() {
+        if let Some(old) = line.old {
+            by_old.entry(old).or_insert(touched[i]);
+        }
+    }
+    move |line| by_old.get(&line).copied()
 }
 
 /// What changed at an item's lines: its quote against the region now. A
@@ -161,14 +169,27 @@ pub fn line_diff(then: &[String], now: &[String]) -> Vec<NoteLine> {
 
 /// New-side position each change line touches: its own number, or for a
 /// removed line the new line it sits before.
-fn touched_new(diff: &FileDiff, i: usize) -> usize {
-    match diff.lines[i].kind {
-        LineKind::Removed => diff.lines[i..]
-            .iter()
-            .find_map(|l| l.new)
-            .unwrap_or_else(|| diff.lines.iter().filter_map(|l| l.new).max().unwrap_or(0) + 1),
-        _ => diff.lines[i].new.unwrap_or(0),
-    }
+fn touched_new(diff: &FileDiff) -> Vec<usize> {
+    // One pass from the end, so a long run of removals costs its length
+    // rather than its length squared.
+    let past_end = diff.lines.iter().filter_map(|l| l.new).max().unwrap_or(0) + 1;
+    let mut next_new = past_end;
+    let mut touched: Vec<usize> = diff
+        .lines
+        .iter()
+        .rev()
+        .map(|line| {
+            if let Some(new) = line.new {
+                next_new = new;
+            }
+            match line.kind {
+                LineKind::Removed => next_new,
+                _ => line.new.unwrap_or(0),
+            }
+        })
+        .collect();
+    touched.reverse();
+    touched
 }
 
 impl AppState {
@@ -209,10 +230,10 @@ impl AppState {
         if let (Some(region), Some(s), false) = (region, section, self.target.is_range()) {
             let diff = &file.sections[s].diff;
             let mut selected = vec![false; diff.lines.len()];
+            let new_lines = touched_new(diff);
             for hunk in &file.views[s].hunks {
                 let touches = hunk.clone().any(|i| {
-                    diff.lines[i].is_change()
-                        && (region.start..=region.end).contains(&touched_new(diff, i))
+                    diff.lines[i].is_change() && (region.start..=region.end).contains(&new_lines[i])
                 });
                 if touches {
                     for i in hunk.clone() {
@@ -449,10 +470,36 @@ mod tests {
         f.write("a.txt", "new\none\nthree\n");
         let snap = crate::git::snapshot(&f.repo, &crate::git::Target::WorkTree).unwrap();
         let diff = &snap.files[0].sections[0].diff;
-        assert_eq!(index_to_worktree(diff, 1), Some(2));
+        let worktree = index_to_worktree(diff);
+        assert_eq!(worktree(1), Some(2));
         // `two` is gone; `three` now stands where it was.
-        assert_eq!(index_to_worktree(diff, 2), Some(3));
-        assert_eq!(index_to_worktree(diff, 3), Some(3));
+        assert_eq!(worktree(2), Some(3));
+        assert_eq!(worktree(3), Some(3));
+    }
+
+    #[test]
+    fn removed_lines_touch_the_next_new_line_or_the_end_of_the_file() {
+        let f = Fixture::new();
+        f.write("a.txt", "one\ntwo\nthree\nfour\nfive\n");
+        f.commit_all("init");
+        f.write("a.txt", "one\nTHREE\nfour\n");
+        let snap = crate::git::snapshot(&f.repo, &crate::git::Target::WorkTree).unwrap();
+        let diff = &snap.files[0].sections[0].diff;
+        // `two` and `three` give way to `THREE` on line 2; `five` was last.
+        assert_eq!(changed_lines(diff), [2, 4]);
+    }
+
+    #[test]
+    fn a_long_run_of_removed_lines_is_mapped_in_linear_time() {
+        let f = Fixture::new();
+        f.write("a.txt", &crate::git::fixture::numbered(50_000));
+        f.commit_all("init");
+        f.write("a.txt", "kept\n");
+        let snap = crate::git::snapshot(&f.repo, &crate::git::Target::WorkTree).unwrap();
+        let diff = &snap.files[0].sections[0].diff;
+        let started = std::time::Instant::now();
+        assert_eq!(changed_lines(diff), [1]);
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
     }
 
     #[test]

@@ -63,13 +63,13 @@ pub struct Layout {
     pub split: bool,
 }
 
-/// `$XDG_STATE_HOME/revmark/sessions`, else `~/.local/state/revmark/sessions`.
+/// `$XDG_STATE_HOME/unau/sessions`, else `~/.local/state/unau/sessions`.
 fn sessions_dir() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state")))?;
-    Some(base.join("revmark").join("sessions"))
+    Some(base.join("unau").join("sessions"))
 }
 
 /// The session file for the repository at `root`.

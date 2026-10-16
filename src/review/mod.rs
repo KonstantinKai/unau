@@ -232,7 +232,7 @@ pub struct Review {
 impl Review {
     pub fn new(name: &str, base: &str) -> Self {
         Self {
-            tool: format!("revmark {}", env!("CARGO_PKG_VERSION")),
+            tool: format!("unau {}", env!("CARGO_PKG_VERSION")),
             status: Status::Open,
             base: base.to_owned(),
             files: BTreeMap::new(),

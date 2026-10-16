@@ -1,4 +1,4 @@
-//! Themes the user writes: a folder under `revmark/themes/` holding a
+//! Themes the user writes: a folder under `unau/themes/` holding a
 //! `theme.toml` and, optionally, a `.tmTheme` for syntax colours.
 
 use super::{Syntax, Theme, by_name, parse_hex};
@@ -26,6 +26,21 @@ struct ThemeFile {
     syntax: Option<String>,
     #[serde(default)]
     colors: BTreeMap<String, String>,
+}
+
+/// Names of the user themes in `themes_dir`: every folder holding a
+/// `theme.toml`, sorted.
+pub fn user_theme_names(themes_dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(themes_dir) else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .flatten()
+        .filter(|e| e.path().join(THEME_FILE).is_file())
+        .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+        .collect();
+    names.sort();
+    names
 }
 
 /// The theme called `name`: a user theme in `themes_dir` if one exists,
@@ -190,7 +205,7 @@ mod tests {
     fn bad_user_themes_fail_naming_the_theme_and_the_culprit() {
         let dir = tempfile::tempdir().unwrap();
         for (name, toml, culprit) in [
-            ("slot", "[colors]\nbackground = \"#000000\"\n", "background"),
+            ("slot", "[colors]\nsidebar = \"#000000\"\n", "sidebar"),
             ("hex", "[colors]\ntext = \"red\"\n", "red"),
             ("key", "colours = 1\n", "colours"),
             ("parent", "extends = \"nowhere\"\n", "nowhere"),

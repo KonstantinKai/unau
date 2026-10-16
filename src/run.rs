@@ -16,7 +16,7 @@ use std::{
 pub enum Place {
     Herdr,
     Tmux,
-    /// In the background, output shown in revmark's run pane.
+    /// In the background, output shown in unau's run pane.
     Pane,
     Foreground,
 }
@@ -224,7 +224,7 @@ impl Background {
     }
 }
 
-/// Quitting revmark mid-run stops the run rather than orphaning it.
+/// Quitting unau mid-run stops the run rather than orphaning it.
 impl Drop for Background {
     fn drop(&mut self) {
         if self.finished().is_none() {
@@ -316,7 +316,7 @@ mod tests {
             return;
         }
         let dir = tempfile::tempdir().unwrap();
-        let socket = format!("revmark-test-{}", std::process::id());
+        let socket = format!("unau-test-{}", std::process::id());
         let server = ["-L", socket.as_str(), "-f", "/dev/null"];
         let tmux = |args: &[&str]| {
             Command::new("tmux")

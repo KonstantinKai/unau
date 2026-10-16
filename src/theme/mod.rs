@@ -6,12 +6,14 @@
 #![allow(clippy::unreadable_literal)]
 
 mod catppuccin;
+mod families;
+mod palette;
 mod user;
 
 pub use catppuccin::{
     LATTE as CATPPUCCIN_LATTE, LATTE_TMTHEME, MACCHIATO as CATPPUCCIN_MACCHIATO, MACCHIATO_TMTHEME,
 };
-pub use user::resolve;
+pub use user::{resolve, user_theme_names};
 
 use anyhow::{Result, bail};
 use ratatui::style::Color;
@@ -24,12 +26,40 @@ pub enum Syntax {
     CatppuccinLatte,
     /// One of syntect's built-in themes, by name.
     Builtin(Cow<'static, str>),
+    /// One of bat's syntax themes, embedded by two-face.
+    Embedded(two_face::theme::EmbeddedThemeName),
+    /// A `.tmTheme` bundled in `assets/themes/`.
+    Vendored(Vendored),
     /// A `.tmTheme` from a user theme, parsed at startup.
     Loaded(Arc<syntect::highlighting::Theme>),
 }
 
+/// Syntax themes bundled as files, each with its license beside it in
+/// `assets/themes/`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Vendored {
+    TokyoNightNight,
+    TokyoNightDay,
+    RosePineMain,
+    RosePineDawn,
+}
+
+impl Vendored {
+    pub fn tm_theme(self) -> &'static [u8] {
+        match self {
+            Self::TokyoNightNight => include_bytes!("../../assets/themes/tokyonight-night.tmTheme"),
+            Self::TokyoNightDay => include_bytes!("../../assets/themes/tokyonight-day.tmTheme"),
+            Self::RosePineMain => include_bytes!("../../assets/themes/rosepine-main.tmTheme"),
+            Self::RosePineDawn => include_bytes!("../../assets/themes/rosepine-dawn.tmTheme"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Colors {
+    /// What the whole screen is filled with, unless the terminal's own
+    /// background is asked for.
+    pub background: Color,
     pub text: Color,
     pub muted: Color,
     pub subtle: Color,
@@ -74,6 +104,7 @@ macro_rules! slots {
 }
 
 slots!(
+    background,
     text,
     muted,
     subtle,
@@ -115,7 +146,31 @@ pub const BUILTIN: &[Theme] = &[
     catppuccin::LATTE,
     DEFAULT_DARK,
     DEFAULT_LIGHT,
+    families::GRUVBOX_DARK_THEME,
+    families::GRUVBOX_LIGHT_THEME,
+    families::DRACULA_THEME,
+    families::NORD_THEME,
+    families::SOLARIZED_DARK_THEME,
+    families::SOLARIZED_LIGHT_THEME,
+    families::ONEHALF_DARK_THEME,
+    families::ONEHALF_LIGHT_THEME,
+    families::TOKYONIGHT_NIGHT_THEME,
+    families::TOKYONIGHT_DAY_THEME,
+    families::ROSEPINE_MAIN_THEME,
+    families::ROSEPINE_DAWN_THEME,
 ];
+
+impl Theme {
+    /// Dark when its text is lighter than mid grey: light text on a dark
+    /// background.
+    pub fn is_dark(&self) -> bool {
+        let Color::Rgb(r, g, b) = self.colors.text else {
+            return true;
+        };
+        // Relative luminance weights, in thousandths.
+        u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114 > 128_000
+    }
+}
 
 /// A built-in theme by name, ignoring user themes.
 pub fn by_name(name: &str) -> Result<Theme> {
@@ -162,11 +217,12 @@ const fn mix(top: u8, base: u8, percent: u16) -> u8 {
     ((top as u16 * percent + base as u16 * (100 - percent) + 50) / 100) as u8
 }
 
-/// The colours revmark shipped with before themes existed.
+/// The colours unau shipped with before themes existed.
 pub const DEFAULT_DARK: Theme = Theme {
     name: Cow::Borrowed("default.dark"),
     syntax: Syntax::Builtin(Cow::Borrowed("base16-ocean.dark")),
     colors: Colors {
+        background: hex(0x1c2028),
         text: hex(0xdcdcdc),
         muted: hex(0x787878),
         subtle: hex(0x9a9a9a),
@@ -194,6 +250,7 @@ pub const DEFAULT_LIGHT: Theme = Theme {
     name: Cow::Borrowed("default.light"),
     syntax: Syntax::Builtin(Cow::Borrowed("InspiredGitHub")),
     colors: Colors {
+        background: hex(0xffffff),
         text: hex(0x1e1e1e),
         muted: hex(0x828282),
         subtle: hex(0x5a5a5a),
@@ -231,6 +288,42 @@ mod tests {
     }
 
     #[test]
+    fn each_builtin_theme_knows_whether_it_is_dark() {
+        let dark: Vec<&str> = BUILTIN
+            .iter()
+            .filter(|t| t.is_dark())
+            .map(|t| t.name.as_ref())
+            .collect();
+        assert_eq!(
+            dark,
+            [
+                "catppuccin.macchiato",
+                "default.dark",
+                "gruvbox.dark",
+                "dracula",
+                "nord",
+                "solarized.dark",
+                "onehalf.dark",
+                "tokyonight.night",
+                "rosepine.main",
+            ]
+        );
+    }
+
+    #[test]
+    fn every_builtin_background_matches_its_kind() {
+        let lightness = |c: Color| match c {
+            Color::Rgb(r, g, b) => u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114,
+            _ => 0,
+        };
+        for theme in BUILTIN {
+            let dark_ground = lightness(theme.colors.background) < 128_000;
+            assert_eq!(dark_ground, theme.is_dark(), "{}", theme.name);
+        }
+        assert_eq!(CATPPUCCIN_LATTE.colors.background, hex(0xeff1f5));
+    }
+
+    #[test]
     fn hex_parses_only_six_digit_colours() {
         assert_eq!(parse_hex("#b7bdf8").unwrap(), Color::Rgb(0xb7, 0xbd, 0xf8));
         for bad in ["b7bdf8", "#b7bdf", "#zzzzzz", "#b7bdf8a"] {
@@ -254,10 +347,10 @@ mod tests {
         assert_eq!(colors.text, hex(0x010203));
         assert!(
             colors
-                .set("background", hex(0))
+                .set("sidebar", hex(0))
                 .unwrap_err()
                 .to_string()
-                .contains("background")
+                .contains("sidebar")
         );
     }
 }

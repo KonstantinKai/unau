@@ -5,7 +5,7 @@
 use super::{AppState, Effect, Pane, Pending};
 use crate::{
     diff::Row,
-    git::{Change, FileDiff, LineKind, SectionKind, apply},
+    git::{Change, FileDiff, LineKind, SectionKind, apply, apply_files},
     review::{Item, Scope},
     tree::Entry,
 };
@@ -216,7 +216,18 @@ impl AppState {
             .flatten();
         let mut done = Vec::new();
         let mut failed = None;
-        for request in requests {
+        if requests.iter().all(|r| r.whole_file) {
+            // Whole files go to git in one call; patches are for lines.
+            let files: Vec<(&str, bool)> = requests
+                .iter()
+                .map(|r| (r.path.as_str(), r.untracked))
+                .collect();
+            match apply_files(&self.repo, first.change, &files) {
+                Ok(()) => done.extend(requests),
+                Err(err) => failed = Some(format!("{err:#}")),
+            }
+        }
+        for request in requests.iter().filter(|r| !r.whole_file) {
             match apply(
                 &self.repo,
                 &request.diff,

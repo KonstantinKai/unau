@@ -198,23 +198,6 @@ impl AppState {
         self.scroll_to_cursor();
     }
 
-    /// The scroll keys in the comments pane: one-line rows, headers skipped.
-    pub fn comments_scroll(&mut self, height: usize, lines: usize, down: bool, moves_cursor: bool) {
-        let starts: Vec<usize> = (0..=self.comments.rows.len()).collect();
-        let rows = &self.comments.rows;
-        let (top, cursor) = super::navigate::scrolled(
-            &starts,
-            |r| matches!(rows[r], CommentRow::Item(_)),
-            (self.comments.scroll, self.comments.cursor),
-            height,
-            lines,
-            down,
-            moves_cursor,
-        );
-        self.comments.scroll = top;
-        self.select_comment_row(cursor, down);
-    }
-
     /// Keeps the selected row inside the visible part of the list.
     pub fn scroll_comments(&mut self) {
         let height = self.comments_height();

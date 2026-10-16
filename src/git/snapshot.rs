@@ -1,6 +1,6 @@
 //! One read of the repository: every changed file with its diff sections.
 
-use super::{FileDiff, LEGACY_REVIEW_DIR, REVIEW_DIR, Repo, Target, parse};
+use super::{FileDiff, Line, LineKind, REVIEW_DIR, Repo, Target, parse};
 use anyhow::Result;
 use std::collections::BTreeMap;
 
@@ -110,12 +110,11 @@ impl Snapshot {
     }
 }
 
-/// Review folders are never part of the change under review: the default and
-/// legacy ones always, and a configured one when it is inside the repository.
+/// Review folders are never part of the change under review: the default one
+/// always, and a configured one when it is inside the repository.
 fn under_review_dir(path: &str, configured: Option<&str>) -> bool {
-    [Some(REVIEW_DIR), Some(LEGACY_REVIEW_DIR), configured]
-        .into_iter()
-        .flatten()
+    std::iter::once(REVIEW_DIR)
+        .chain(configured)
         .any(|dir| path == dir || path.starts_with(&format!("{dir}/")))
 }
 
@@ -126,6 +125,43 @@ const DIFF: [&str; 5] = [
     "--no-color",
     FULL_CONTEXT,
 ];
+
+/// Bytes git looks at to call a file binary.
+const BINARY_SNIFF: usize = 8000;
+
+/// An untracked file's diff against nothing: every line added. Built here
+/// rather than by one `git diff --no-index` per file, which costs a process
+/// each and made every re-read of a busy repository take seconds.
+fn untracked_diff(repo: &Repo, path: &str) -> FileDiff {
+    let full = repo.root.join(path);
+    // Git diffs a symlink as its target, one line with no newline.
+    let bytes = match std::fs::read_link(&full) {
+        Ok(target) => target.to_string_lossy().into_owned().into_bytes(),
+        Err(_) => std::fs::read(&full).unwrap_or_default(),
+    };
+    let binary = bytes.iter().take(BINARY_SNIFF).any(|b| *b == 0);
+    let mut lines = Vec::new();
+    if !binary {
+        let text = String::from_utf8_lossy(&bytes);
+        for (i, line) in text.split_inclusive('\n').enumerate() {
+            let body = line.strip_suffix('\n');
+            lines.push(Line {
+                kind: LineKind::Added,
+                old: None,
+                new: Some(i + 1),
+                text: body.unwrap_or(line).to_owned(),
+                no_newline: body.is_none(),
+            });
+        }
+    }
+    FileDiff {
+        path: path.to_owned(),
+        binary,
+        new_file: true,
+        deleted: false,
+        lines,
+    }
+}
 
 pub fn snapshot(repo: &Repo, target: &Target) -> Result<Snapshot> {
     let mut files: BTreeMap<String, FileEntry> = BTreeMap::new();
@@ -160,16 +196,8 @@ pub fn snapshot(repo: &Repo, target: &Target) -> Result<Snapshot> {
             }
             let untracked = repo.run(&["ls-files", "--others", "--exclude-standard", "-z"])?;
             for path in untracked.split('\0').filter(|p| !p.is_empty()) {
-                if under_review_dir(path, configured) {
-                    continue;
-                }
-                let mut args = DIFF.to_vec();
-                args.extend(["--no-index", "--", "/dev/null", path]);
-                // `--no-index` exits 1 when the files differ, which they always do here.
-                let output = repo.output(&args)?;
-                for mut diff in parse(&String::from_utf8_lossy(&output.stdout)) {
-                    path.clone_into(&mut diff.path);
-                    add(diff, SectionKind::Unstaged, true);
+                if !under_review_dir(path, configured) {
+                    add(untracked_diff(repo, path), SectionKind::Unstaged, true);
                 }
             }
             let mut args = DIFF.to_vec();
@@ -226,9 +254,8 @@ mod tests {
         let f = Fixture::new();
         f.write("a.txt", "one\n");
         f.commit_all("init");
-        f.write(".revmark/2026-10-14-00.md", "# Review\n");
-        f.write(".revmark/instructions.md", "Be brief.\n");
-        f.write(".review/2026-10-13-00.md", "# Old review\n");
+        f.write(".unau/2026-10-14-00.md", "# Review\n");
+        f.write(".unau/instructions.md", "Be brief.\n");
         f.write("a.txt", "two\n");
         let snap = snapshot(&f.repo, &Target::WorkTree).unwrap();
         let paths: Vec<_> = snap.files.iter().map(|e| e.path.as_str()).collect();
@@ -246,6 +273,32 @@ mod tests {
         let snap = snapshot(&f.repo, &Target::WorkTree).unwrap();
         let paths: Vec<_> = snap.files.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(paths, ["docs/other.md"]);
+    }
+
+    #[test]
+    fn untracked_diffs_built_here_match_what_git_gives() {
+        let f = Fixture::new();
+        f.write("seed.txt", "a\n");
+        f.commit_all("init");
+        let cases: [(&str, &[u8]); 6] = [
+            ("plain.txt", b"one\ntwo\n"),
+            ("no-newline.txt", b"one\ntwo"),
+            ("crlf.txt", b"one\r\ntwo\r\n"),
+            ("empty.txt", b""),
+            ("blank-lines.txt", b"\n\n\n"),
+            ("image.bin", b"PNG\0\x01\x02 data\n"),
+        ];
+        for (path, bytes) in cases {
+            std::fs::write(f.path().join(path), bytes).unwrap();
+            let mut args = DIFF.to_vec();
+            args.extend(["--no-index", "--", "/dev/null", path]);
+            let output = f.repo.output(&args).unwrap();
+            let mut from_git = parse(&String::from_utf8_lossy(&output.stdout));
+            for diff in &mut from_git {
+                path.clone_into(&mut diff.path);
+            }
+            assert_eq!(vec![untracked_diff(&f.repo, path)], from_git, "{path}");
+        }
     }
 
     #[test]

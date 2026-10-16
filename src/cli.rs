@@ -20,11 +20,11 @@ pub struct Args {
     #[arg(long, value_name = "FILE", conflicts_with = "target")]
     pub review: Option<PathBuf>,
 
-    /// Reopen the newest review in `.revmark/`; start a new one if there is none.
+    /// Reopen the newest review in `.unau/`; start a new one if there is none.
     #[arg(long = "continue", conflicts_with_all = ["review", "target", "path", "out"])]
     pub resume: bool,
 
-    /// Print the review to stdout on exit instead of writing `.revmark/`. Only `-` is accepted.
+    /// Print the review to stdout on exit instead of writing `.unau/`. Only `-` is accepted.
     #[arg(long, value_name = "-")]
     pub out: Option<String>,
 
@@ -32,12 +32,12 @@ pub struct Args {
     #[arg(last = true, value_name = "PATH")]
     pub path: Option<PathBuf>,
 
-    /// Print the licenses and third-party notices included in revmark.
+    /// Print the licenses and third-party notices included in unau.
     #[arg(long, exclusive = true)]
     pub licenses: bool,
 }
 
-/// Every license text revmark carries: its own, the notices for code and
+/// Every license text unau carries: its own, the notices for code and
 /// themes bundled in it, its dependencies' notices, and those of the syntax
 /// definitions and themes `two-face` embeds, which no crate manifest lists.
 pub fn licenses() -> String {
@@ -49,6 +49,8 @@ pub fn licenses() -> String {
         include_str!("../LICENSE"),
         include_str!("../assets/notices/ANNODIFF-LICENSE"),
         include_str!("../assets/themes/CATPPUCCIN-LICENSE"),
+        include_str!("../assets/themes/TOKYONIGHT-LICENSE"),
+        include_str!("../assets/themes/ROSEPINE-LICENSE"),
         include_str!("../THIRD_PARTY_NOTICES.md"),
         &embedded,
     ]
@@ -109,13 +111,13 @@ fn repo_at(path: &Path) -> Result<Repo> {
     Repo::discover(dir)
 }
 
-/// Where the user config lives: `$XDG_CONFIG_HOME/revmark` or `~/.config/revmark`.
+/// Where the user config lives: `$XDG_CONFIG_HOME/unau` or `~/.config/unau`.
 pub fn user_config() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
-    Some(base.join("revmark").join("config.toml"))
+    Some(base.join("unau").join("config.toml"))
 }
 
 #[cfg(test)]
@@ -184,16 +186,12 @@ mod tests {
 
     #[test]
     fn continue_stands_alone() {
-        assert!(
-            Args::try_parse_from(["revmark", "--continue"])
-                .unwrap()
-                .resume
-        );
+        assert!(Args::try_parse_from(["unau", "--continue"]).unwrap().resume);
         for clash in [
-            &["revmark", "--continue", "--review", "x.md"][..],
-            &["revmark", "--continue", "HEAD"],
-            &["revmark", "--continue", "--out", "-"],
-            &["revmark", "--continue", "--", "src"],
+            &["unau", "--continue", "--review", "x.md"][..],
+            &["unau", "--continue", "HEAD"],
+            &["unau", "--continue", "--out", "-"],
+            &["unau", "--continue", "--", "src"],
         ] {
             assert!(Args::try_parse_from(clash).is_err(), "{clash:?}");
         }
@@ -206,6 +204,8 @@ mod tests {
             "MIT License",
             "MelsRoughSketch",
             "Catppuccin",
+            "tokyonight.nvim",
+            "rose-pine/tm-theme",
             "# Third-party notices",
             "### MIT License",
             "embedded through two-face",
@@ -213,20 +213,20 @@ mod tests {
             assert!(text.contains(part), "missing {part}");
         }
         assert!(
-            Args::try_parse_from(["revmark", "--licenses"])
+            Args::try_parse_from(["unau", "--licenses"])
                 .unwrap()
                 .licenses
         );
-        assert!(Args::try_parse_from(["revmark", "--licenses", "HEAD"]).is_err());
+        assert!(Args::try_parse_from(["unau", "--licenses", "HEAD"]).is_err());
     }
 
     #[test]
     fn out_accepts_only_stdout() {
-        let args = Args::try_parse_from(["revmark", "--out", "-"]).unwrap();
+        let args = Args::try_parse_from(["unau", "--out", "-"]).unwrap();
         assert!(args.stdout().unwrap());
-        let args = Args::try_parse_from(["revmark", "--out", "x.md"]).unwrap();
+        let args = Args::try_parse_from(["unau", "--out", "x.md"]).unwrap();
         assert!(args.stdout().is_err());
-        let args = Args::try_parse_from(["revmark", "--", "HEAD"]).unwrap();
+        let args = Args::try_parse_from(["unau", "--", "HEAD"]).unwrap();
         assert_eq!(args.path.as_deref(), Some(Path::new("HEAD")));
         assert!(args.target.is_none());
     }

@@ -11,6 +11,12 @@ impl AppState {
         if self.prompt.is_some() {
             return self.prompt_key(key);
         }
+        if self.theme_picker.is_some() {
+            return self.theme_picker_key(key);
+        }
+        if self.filter.typing {
+            return self.filter_key(key);
+        }
         if let Some(confirm) = self.confirm.take() {
             if key == Key::char('y') {
                 return self.run_pending(confirm.pending);
@@ -20,6 +26,14 @@ impl AppState {
         }
         if self.help {
             self.help = false;
+            return Effect::None;
+        }
+        if key.code == KeyCodeKey::Esc
+            && self.pressed.is_empty()
+            && self.focus == super::Pane::Tree
+            && self.filter.is_set()
+        {
+            self.clear_filter();
             return Effect::None;
         }
         if key.code == KeyCodeKey::Esc && self.pressed.is_empty() {
@@ -74,6 +88,7 @@ impl AppState {
             Action::FoldAll => self.fold_all(),
             Action::UnfoldAll => self.unfold_all(),
             Action::FlatTree => self.toggle_flat(),
+            Action::Filter => self.start_filter(),
             Action::Select => self.toggle_select(),
             Action::Stage => return self.stage_key(crate::git::Change::Stage, false),
             Action::Unstage => return self.stage_key(crate::git::Change::Unstage, false),
@@ -111,6 +126,7 @@ impl AppState {
             Action::Run => return self.run(),
             Action::RunPane => return self.toggle_run_pane(),
             Action::EditConfig => return self.edit_config(),
+            Action::Themes => self.open_theme_picker(),
             Action::EditInstructions => return self.edit_instructions(),
             Action::OpenFile => return self.open_file(),
             Action::Accept => self.accept(),
@@ -155,9 +171,9 @@ impl AppState {
             stakes.push("a command is still running and will be stopped".to_owned());
         }
         let question = if stakes.is_empty() {
-            "Quit revmark?".to_owned()
+            "Quit unau?".to_owned()
         } else {
-            format!("Quit revmark? {}.", stakes.join("; "))
+            format!("Quit unau? {}.", stakes.join("; "))
         };
         self.ask(question, Pending::Quit);
         Effect::None
@@ -243,6 +259,14 @@ impl AppState {
                 prompt.text = chars.into_iter().collect();
                 prompt.cursor -= 1;
             }
+            (KeyCodeKey::Char('w'), true) => {
+                let start = word_start(&chars, prompt.cursor);
+                prompt.text = chars[..start]
+                    .iter()
+                    .chain(&chars[prompt.cursor..])
+                    .collect();
+                prompt.cursor = start;
+            }
             (KeyCodeKey::Left, _) => prompt.cursor = prompt.cursor.saturating_sub(1),
             (KeyCodeKey::Right, _) => prompt.cursor = (prompt.cursor + 1).min(chars.len()),
             (KeyCodeKey::AltEnter, _) | (KeyCodeKey::Char('j'), true) => {
@@ -288,6 +312,19 @@ impl AppState {
             prompt.text = chars.into_iter().collect();
         }
     }
+}
+
+/// Where the word before `cursor` starts, as shells see it for `C-w`: the
+/// whitespace right before the cursor, then the run of non-whitespace.
+pub(super) fn word_start(chars: &[char], cursor: usize) -> usize {
+    let mut at = cursor.min(chars.len());
+    while at > 0 && chars[at - 1].is_whitespace() {
+        at -= 1;
+    }
+    while at > 0 && !chars[at - 1].is_whitespace() {
+        at -= 1;
+    }
+    at
 }
 
 /// Quotes a path for `sh -c`.
@@ -371,7 +408,7 @@ mod tests {
         let f = repo();
         let mut s = state(&f);
         assert_eq!(press(&mut s, "Q"), Effect::None);
-        assert_eq!(s.confirm.as_ref().unwrap().question, "Quit revmark?");
+        assert_eq!(s.confirm.as_ref().unwrap().question, "Quit unau?");
         assert_eq!(press(&mut s, "n"), Effect::None);
         assert!(s.confirm.is_none());
         press(&mut s, "nsomething\n");
@@ -438,6 +475,46 @@ mod tests {
         press(&mut s, "\x1b");
         assert!(s.prompt.is_none());
         assert!(s.review.is_empty());
+    }
+
+    #[test]
+    fn ctrl_w_deletes_the_word_before_the_cursor_in_the_comment_popup() {
+        let f = repo();
+        let mut s = state(&f);
+        let ctrl = |c| Key {
+            code: KeyCodeKey::Char(c),
+            ctrl: true,
+        };
+        press(&mut s, "nfix the  loo");
+        s.handle_key(ctrl('w'));
+        assert_eq!(s.prompt.as_ref().unwrap().text, "fix the  ");
+        s.handle_key(ctrl('w'));
+        assert_eq!(s.prompt.as_ref().unwrap().text, "fix ");
+        // In the middle: only what is before the cursor goes.
+        let left = Key {
+            code: KeyCodeKey::Left,
+            ctrl: false,
+        };
+        press(&mut s, "it");
+        s.handle_key(left);
+        s.handle_key(left);
+        s.handle_key(ctrl('w'));
+        let prompt = s.prompt.as_ref().unwrap();
+        assert_eq!((prompt.text.as_str(), prompt.cursor), ("it", 0));
+        s.handle_key(ctrl('w'));
+        assert_eq!(
+            s.prompt.as_ref().unwrap().text,
+            "it",
+            "nothing before the start"
+        );
+    }
+
+    #[test]
+    fn word_start_skips_spaces_then_the_word() {
+        let chars: Vec<char> = "ab  cd ".chars().collect();
+        assert_eq!(word_start(&chars, 7), 4);
+        assert_eq!(word_start(&chars, 4), 0);
+        assert_eq!(word_start(&chars, 0), 0);
     }
 
     #[test]

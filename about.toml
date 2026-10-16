@@ -1,4 +1,4 @@
-# cargo-about: which dependency licenses revmark accepts. A dependency under
+# cargo-about: which dependency licenses unau accepts. A dependency under
 # any other license fails `cargo about generate` until it is looked at and
 # added here on purpose.
 accepted = [

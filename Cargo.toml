@@ -1,11 +1,11 @@
 [package]
-name = "revmark"
+name = "unau"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.92"
 description = "Terminal code review that ends in a file an agent can act on"
 license = "MIT"
-repository = "https://github.com/KonstantinKai/revmark"
+repository = "https://github.com/KonstantinKai/unau"
 keywords = ["tui", "git", "diff", "code-review", "agent"]
 categories = ["command-line-utilities", "development-tools"]
 include = ["src/**/*", "assets/themes/*", "assets/notices/*", "THIRD_PARTY_NOTICES.md", "README.md", "CHANGELOG.md", "LICENSE", "Cargo.toml"]
@@ -21,6 +21,7 @@ serde_json = "1.0.154"
 syntect = { version = "5.3.0", default-features = false, features = ["default-fancy"] }
 tempfile = "3"
 toml = "1"
+toml_edit = "0.25.17"
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"] }
 unicode-width = "0.2.2"
 

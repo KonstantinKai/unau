@@ -1,7 +1,7 @@
 //! The comment popup: a bordered box that floats next to the lines being
 //! commented on, so they stay readable while typing.
 
-use super::border;
+use super::{POPUP_PADDING, popup_block};
 use crate::{
     app::{AppState, Pane, PromptPurpose},
     diff::{display_width, wrap_ranges},
@@ -21,7 +21,7 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
 };
 
 /// Most text lines the popup shows before it scrolls.
@@ -136,7 +136,7 @@ pub fn render(state: &AppState, frame: &mut Frame, pane: Rect, app: Rect, colors
             .width
             .saturating_sub(4)
             .clamp(1, MAX_WIDTH)
-            .saturating_sub(2),
+            .saturating_sub(2 + 2 * POPUP_PADDING),
     )
     .max(1);
     let lines = wrapped(&prompt.text, text_width);
@@ -151,9 +151,7 @@ pub fn render(state: &AppState, frame: &mut Frame, pane: Rect, app: Rect, colors
         .take(visible)
         .map(|(s, e)| Line::styled(prompt.text[*s..*e].to_owned(), Style::new().fg(colors.text)))
         .collect();
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(border(true, colors))
+    let block = popup_block(colors, colors.border_active)
         .title(Line::from(vec![
             Span::raw(" "),
             Span::styled(
@@ -170,13 +168,12 @@ pub fn render(state: &AppState, frame: &mut Frame, pane: Rect, app: Rect, colors
         .title_bottom(Span::styled(
             " Enter save · Alt-Enter newline · Esc cancel · C-e editor ",
             Style::new().fg(colors.muted),
-        ))
-        .style(Style::new().bg(colors.note_bg));
+        ));
     frame.render_widget(Clear, area);
     frame.render_widget(Paragraph::new(body).block(block), area);
-    let x = area.x + 1 + u16::try_from(cursor_col).unwrap_or(u16::MAX);
+    let x = area.x + 1 + POPUP_PADDING + u16::try_from(cursor_col).unwrap_or(u16::MAX);
     let y = area.y + 1 + u16::try_from(cursor_line - first).unwrap_or(0);
-    frame.set_cursor_position((x.min(area.right().saturating_sub(2)), y));
+    frame.set_cursor_position((x.min(area.right().saturating_sub(2 + POPUP_PADDING)), y));
 }
 
 #[cfg(test)]

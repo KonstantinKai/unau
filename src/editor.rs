@@ -38,7 +38,7 @@ pub fn open_at(path: &Path, line: Option<usize>) -> Result<bool> {
 /// text, or `None` when the editor exited with an error.
 pub fn edit(text: &str, suffix: &str) -> Result<Option<String>> {
     let mut file = tempfile::Builder::new()
-        .prefix("revmark-")
+        .prefix("unau-")
         .suffix(suffix)
         .tempfile()?;
     file.write_all(text.as_bytes())?;

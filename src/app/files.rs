@@ -83,14 +83,13 @@ impl FileState {
         let unstaged = self.annotatable().map(|s| &self.sections[s].diff);
         let mut lines = unstaged.map(rereview::changed_lines).unwrap_or_default();
         if let Some(staged) = self.sections.iter().find(|s| s.kind == SectionKind::Staged) {
-            lines.extend(
-                rereview::changed_lines(&staged.diff)
-                    .into_iter()
-                    .filter_map(|index_line| match unstaged {
-                        Some(diff) => rereview::index_to_worktree(diff, index_line),
-                        None => Some(index_line),
-                    }),
-            );
+            let staged_lines = rereview::changed_lines(&staged.diff).into_iter();
+            match unstaged {
+                Some(diff) => {
+                    lines.extend(staged_lines.filter_map(rereview::index_to_worktree(diff)));
+                }
+                None => lines.extend(staged_lines),
+            }
             lines.sort_unstable();
             lines.dedup();
         }

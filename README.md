@@ -1,20 +1,28 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/brand/header-dark.png">
-  <img alt="revmark: terminal code review that ends in a file an agent can act on." src="assets/brand/header-light.png">
+  <img alt="unau: terminal code review that ends in a file an agent can act on." src="assets/brand/header-light.png">
 </picture>
+
+**unau** (say *YOO-now*, /ˈjuː.naʊ/) is the two-toed sloth: slow down, read the
+diff, then hand it off.
 
 Open the working tree diff (or a commit, or a range) in a lazygit-shaped TUI: a
 folding file tree on the left, the diff on the right. Stage the lines that are
 right. Mark the lines that aren't with a comment, a question, or replacement
-code. Every mark lands in `.revmark/<date>-<n>.md` as it happens, a Markdown
+code. Every mark lands in `.unau/<date>-<n>.md` as it happens, a Markdown
 checklist with anchors an agent can follow. Point your agent at the file, let it
 work, reopen the review to see what changed, accept or push back.
 
-## How to work with revmark
+unau is agent-agnostic. It knows no agent and links no SDK: the review is
+plain Markdown, and the hand-off is a command line you configure with `{file}`
+in it, so Claude Code, Codex, Aider, Gemini CLI, a script of your own or a
+person can all work from it.
+
+## How to work with unau
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/workflow-dark.png">
-  <img alt="Who does what: you read the diff, stage what is right and mark what is wrong; revmark writes each mark to the review file and runs your agent on it; the agent works each item from [~] to [x]; revmark picks up the ticks and shows each one against the code now; you accept or push back until nothing is open or unstaged." src="assets/workflow-light.png">
+  <img alt="Who does what: you read the diff, stage what is right and mark what is wrong; unau writes each mark to the review file and runs your agent on it; the agent works each item from [~] to [x]; unau picks up the ticks and shows each one against the code now; you accept or push back until nothing is open or unstaged." src="assets/workflow-light.png">
 </picture>
 
 1. **Review.** Walk the diff. Stage what is right (`s` lines or hunks, `gs` a
@@ -24,14 +32,14 @@ work, reopen the review to see what changed, accept or push back.
    review file the moment you make it, anchored to new-side lines with the code
    quoted.
 3. **Hand off.** `r` runs your agent on the review file, in a tmux or Herdr
-   pane, the foreground, or the run pane inside revmark. The agent marks the
+   pane, the foreground, or the run pane inside unau. The agent marks the
    item it is on `[~]`, ticks it `[x]` with a note when done, and never stages.
-4. **Re-review.** revmark picks the ticks up live (or later with `--continue`).
+4. **Re-review.** unau picks the ticks up live (or later with `--continue`).
    Each ticked item shows its quoted lines against the code now. `a` accepts:
    the fix is staged and the item leaves the file. `c` pushes back with a new
    open item for the next run.
 5. **Done** when no item is open and nothing is left unstaged. Commit as you
-   normally would; revmark never commits.
+   normally would; unau never commits.
 
 ## Install
 
@@ -39,18 +47,18 @@ work, reopen the review to see what changed, accept or push back.
 cargo install --path .
 ```
 
-Needs `git` on `PATH`. revmark shells out to it and links no git library.
+Needs `git` on `PATH`. unau shells out to it and links no git library.
 
 ## Usage
 
 ```sh
-revmark                 # working tree vs HEAD: staged, unstaged, untracked
-revmark HEAD~1          # one commit
-revmark main..HEAD      # a range; staging keys are off in range mode
-revmark -- main         # a path called main, not the branch
-revmark --review .revmark/2026-10-14-00.md  # reopen a review
-revmark --continue      # reopen the newest review; start a new one if there is none
-revmark --out -         # print the review on exit instead of writing .revmark/
+unau                 # working tree vs HEAD: staged, unstaged, untracked
+unau HEAD~1          # one commit
+unau main..HEAD      # a range; staging keys are off in range mode
+unau -- main         # a path called main, not the branch
+unau --review .unau/2026-10-14-00.md  # reopen a review
+unau --continue      # reopen the newest review; start a new one if there is none
+unau --out -         # print the review on exit instead of writing .unau/
 ```
 
 A path that exists wins over a revision with the same name; `--` forces the
@@ -59,7 +67,7 @@ path reading.
 The working tree view shows each file's unstaged lines and, under a `staged`
 strip, the lines already in the index. Staged means accepted: staged lines never
 appear in the review, and an annotation on lines you stage leaves the review
-(revmark asks first).
+(unau asks first).
 
 In the files pane, each file starts with its git status: `M` modified, `A`
 added, `D` deleted, `?` untracked (a rename shows as a `D` and an `A`). After
@@ -68,7 +76,7 @@ the name, `●` marks unstaged lines, `✓` staged ones, `✎ n` the annotations
 and `✓` for the files under it, so a directory showing only `✓` is fully
 staged.
 
-revmark never edits `.gitignore`. Add `.revmark/` to it yourself if you don't
+unau never edits `.gitignore`. Add `.unau/` to it yourself if you don't
 want reviews tracked, or keep reviews out of the repository altogether with
 `[review] dir`:
 
@@ -78,20 +86,20 @@ dir = "~/reviews/{repo}"   # {repo} is the repository's folder name
 ```
 
 A relative path starts at the repository root (`dir = "docs/reviews"`), and a
-folder inside the repository is kept out of the diff like `.revmark/` is. Set
+folder inside the repository is kept out of the diff like `.unau/` is. Set
 it in your own config for every repository, or in a repository's
-`.revmark.toml` for that one; it takes effect the next time revmark starts.
+`.unau.toml` for that one; it takes effect the next time unau starts.
 `--continue` looks there, and the agent gets the full path in `{file}`. A
-repository's own `.revmark/instructions.md` stays where it is.
+repository's own `.unau/instructions.md` stays where it is.
 
-revmark picks up where you left off. On quit it saves the open file and cursor
+unau picks up where you left off. On quit it saves the open file and cursor
 line, the focused pane, folded directories, the files pane width, zoom and the
 unified or side-by-side view, and restores them the next time you open it in
 the same repository. The comments pane and the last run's output come back
 only when you continue a review (`--continue` or `--review`); a fresh review
 starts without them. A run still going when you quit is stopped and comes back
 as `exited -1`. Sessions live in
-`$XDG_STATE_HOME/revmark/sessions/` (else `~/.local/state/revmark/sessions/`),
+`$XDG_STATE_HOME/unau/sessions/` (else `~/.local/state/unau/sessions/`),
 one small file per repository and never inside it; delete one to start clean.
 
 ## Keys
@@ -101,14 +109,15 @@ one small file per repository and never inside it; delete one to start clean.
 | `j` `k` | next / previous line |
 | `J` `K` | next / previous block of changed lines (added or removed), even when it is close enough to the last one to share its hunk |
 | `gg` `G` | first / last line |
-| `Ctrl-e` `Ctrl-y` | scroll one line; the cursor stays unless it would leave the screen |
-| `Ctrl-d` `Ctrl-u` | half a page down / up |
-| `Ctrl-f` `Ctrl-b` | a page down / up |
+| `Ctrl-e` `Ctrl-y` | scroll the diff one line; the cursor stays unless it would leave the screen |
+| `Ctrl-d` `Ctrl-u` | scroll the diff half a page down / up |
+| `Ctrl-f` `Ctrl-b` | scroll the diff a page down / up. The scroll keys move the diff from the files and comments panes too, without leaving them; in the run pane they scroll its output |
 | `h` `l` `Tab` | focus files / diff / cycle in pane-number order: files → diff → comments → run (shown panes only) |
 | `1` `2` `3` `4` | focus files / diff / comments / run pane (the last two shown if hidden); each pane's title starts with its number |
 | `Enter` | fold a directory, open a file; on a separator, expand |
 | `W` `E` | fold / unfold every directory (folding all leaves nested ones folded too) |
 | `-` | flat file list |
+| `/` | filter the files pane by path, live and ignoring case; `Enter` keeps it, `Esc` clears it. Staging a folder then takes only the files shown |
 | `L` | comments pane under the files pane: every comment in one list; moving through it shows each one in the diff, `Enter` jumps there. `L` again hides it |
 | `v` | start or end a selection |
 | `s` `u` `d` | stage, unstage, discard: in the diff, the selection or the hunk under the cursor; in the files pane, the whole file, or every file under a directory (`d` asks) |
@@ -126,6 +135,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `r` | run the configured command on the review file (with `in = "pane"`: again while running offers to stop it) |
 | `R` | show / hide the run pane |
 | `,` | open your config in `$EDITOR` (created with every setting commented out the first time) |
+| `T` | pick a theme, previewed live; `Enter` saves it to your config |
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
 | `a` | accept a done item: stage its hunk, drop it from the review |
@@ -138,13 +148,15 @@ whether the comment is a `fix` or a `question`; `Tab` switches between them
 (editing starts from the item's own kind). `Enter` saves,
 `Alt-Enter` starts a new line (`Ctrl-j` too, if your multiplexer doesn't
 take it), `Esc` cancels and `Ctrl-e` moves the text into
-`$EDITOR`.
+`$EDITOR`. Editing works as in a shell: `Ctrl-w` deletes the word before the
+cursor, `Ctrl-u` everything before it, and `Ctrl-a` jumps to the start.
+`Ctrl-w` works in the files filter too.
 
 ## The review file
 
 ````md
 ---
-tool: revmark 0.1.0
+tool: unau 0.1.0
 status: open
 base: HEAD
 files:
@@ -200,9 +212,9 @@ files:
 - Fences grow longer than any backtick run inside them, so quoted Markdown
   cannot break the file.
 - `files:` holds the blob id of each annotated file at review time.
-- The agent ticks items and sets `status`. revmark never writes `done`. If the
-  agent edits the file while revmark runs, revmark merges: the agent's ticks win
-  and revmark's own changes go on top.
+- The agent ticks items and sets `status`. unau never writes `done`. If the
+  agent edits the file while unau runs, unau merges: the agent's ticks win
+  and unau's own changes go on top.
 
 ## Re-review
 
@@ -210,11 +222,11 @@ Reopen with `--review <file>`. A ticked item shows its quoted lines against
 what is there now. `a` stages the hunks that touch it and removes it from the
 file. `c` pushes back: the item becomes a new open one with your comment. A
 file that changed since the review was written carries a `Δ` in the file tree. When
-nothing is open and nothing is left unstaged, revmark says the review is
+nothing is open and nothing is left unstaged, unau says the review is
 complete.
 
 If the agent rewrote every quoted line and nothing changed at the anchor,
-revmark marks the item "anchor lost"; stage the fix by hand and delete the item.
+unau marks the item "anchor lost"; stage the fix by hand and delete the item.
 
 ## Agent instructions
 
@@ -224,14 +236,23 @@ exists:
 
 | File | Applies to |
 |---|---|
-| `.revmark/instructions.md` in the repository | this workspace only |
-| `~/.config/revmark/instructions.md` | every workspace |
+| `instructions.md` in the review folder (`.unau/`, or `[review] dir`) | this workspace only |
+| `~/.config/unau/instructions.md` | every workspace |
 | neither | the built-in default |
 
-Press `i` to edit the file in effect. If there is none yet, revmark creates
+Press `i` to edit the file in effect. If there is none yet, unau creates
 the global one with the default text, so there is something to start from. To
 give one repository its own instructions, put an `instructions.md` in its
-`.revmark/` folder. On its own it replaces the global file and the default.
+review folder. On its own it replaces the global file and the default.
+To keep them somewhere else, point `[review] instructions` at the file, in
+the repository's `.unau.toml` or your own config (a relative path starts at
+the repository root, `~/` and `{repo}` work as in `dir`):
+
+```toml
+[review]
+instructions = "docs/agents/review.md"
+```
+
 To add to them instead, put a line `{inherit}` where the inherited text should
 go:
 
@@ -248,19 +269,48 @@ and updates to either reach every repository that inherits them.
 The text is copied into a review when the review file is created. Editing the
 instructions later changes new reviews only: a review the agent may already
 have read keeps what it was written with. Saved changes are picked up while
-revmark runs, the same way config changes are.
+unau runs, the same way config changes are.
 
-`.revmark/` is usually ignored by git, so a repository's instructions stay on
+### Writing your own
+
+The instructions sit in a quote block at the top of every review, under
+**Agent instructions**, and the agent reads them before the items. A few
+things keep them working:
+
+- **Keep the default's rules, or `{inherit}` them.** The review only moves
+  when the agent marks items `[~]` and `[x]` and sets `status`; a file that
+  replaces the default without those rules leaves the review looking
+  untouched.
+- **No `#` headings.** Inside the quote they render bigger than the review's
+  own `## General` and `## path` sections, and the instructions read as part
+  of the review. Start a group with a bold line instead, and use lists under
+  it.
+- **Short, and pointing elsewhere.** Every review carries the full text, and
+  the agent reads it on every run. Long procedures belong in a file in the
+  repository that the instructions name (`Read docs/agents/review.md before
+  you start.`).
+- **Paths from the repository root**, the way the agent sees them.
+
+```md
+{inherit}
+
+**Before you fix a comment, decide what kind it is.**
+
+- *A bug:* write the failing test first, then fix it; the steps are in
+  `docs/agents/bugs.md`.
+- *A style or architecture note:* fix the instance, then add the rule to
+  `docs/agents/rules/` so the next one cannot happen.
+- Run `pnpm test` before ticking an item.
+```
+
+`.unau/` is usually ignored by git, so a repository's instructions stay on
 your machine. To share them with your team, un-ignore that one file
-(`!.revmark/instructions.md`).
-
-Reviews from before the rename lived in `.review/`. revmark still keeps that
-folder out of the diff; move or delete it whenever you like.
+(`!.unau/instructions.md`).
 
 ## Configuration
 
-`~/.config/revmark/config.toml` (or `$XDG_CONFIG_HOME/revmark/config.toml`),
-then `.revmark.toml` in the repository on top:
+`~/.config/unau/config.toml` (or `$XDG_CONFIG_HOME/unau/config.toml`),
+then `.unau.toml` in the repository on top:
 
 ```toml
 [keys]
@@ -276,10 +326,12 @@ output = "plain"             # plain | claude-stream (run pane, see below)
 [ui]
 line_numbers = "both"        # both | new
 confirm_quit = true          # Q asks before quitting
+background = "theme"         # theme | terminal (keep the terminal's own, transparency included)
 
 [review]
 quote_lines = 12             # longer quotes keep their first & last 3 lines; 0 = never cap
-dir = ".revmark"             # where reviews go (see below)
+dir = ".unau"             # where reviews go (see below)
+# instructions = "docs/agents/review.md"   # this repo's agent instructions; default: instructions.md in dir
 
 [theme]
 mode = "auto"                # auto | light | dark
@@ -291,40 +343,65 @@ border_active = "#f5bde6"
 ```
 
 Action names are the ones `?` lists. An unknown action, or a key that is the
-start of another binding, stops revmark at startup with the names involved.
+start of another binding, stops unau at startup with the names involved.
 
-Changes apply without a restart. Press `,` to edit your config; revmark reloads
+Changes apply without a restart. Press `,` to edit your config; unau reloads
 it when the editor closes. Saving either config file from anywhere else (another
 pane, your usual editor) is picked up within a quarter of a second too. If the
-new file has a mistake, revmark keeps the config it was running with and shows
+new file has a mistake, unau keeps the config it was running with and shows
 the error in the status line.
 
 ### Themes
 
-Built in: `catppuccin.macchiato` and `catppuccin.latte` (the defaults),
-`default.dark` and `default.light`. `mode = "auto"` picks the dark or light
-theme from the terminal background (`COLORFGBG`), falling back to dark.
+Built in:
+
+| Family | Dark | Light |
+|---|---|---|
+| Catppuccin (default) | `catppuccin.macchiato` | `catppuccin.latte` |
+| Gruvbox | `gruvbox.dark` | `gruvbox.light` |
+| Dracula | `dracula` | |
+| Nord | `nord` | |
+| Solarized | `solarized.dark` | `solarized.light` |
+| One Half | `onehalf.dark` | `onehalf.light` |
+| Tokyo Night | `tokyonight.night` | `tokyonight.day` |
+| Rosé Pine | `rosepine.main` | `rosepine.dawn` |
+| unau's first colours | `default.dark` | `default.light` |
+
+`mode = "auto"` picks the dark or light theme from the terminal background
+(`COLORFGBG`), falling back to dark.
+
+Press `T` to pick one: every built-in and user theme, dark and light grouped,
+previewed live as you move. `Enter` writes it to your config (`dark = …` or
+`light = …`, plus `mode` when your background would otherwise hide it), leaving
+the rest of the file and its comments alone; `Esc` puts back what you had. A
+repository's `.unau.toml` that sets `[theme]` still wins there, and the
+picker says so.
 
 Languages come from bat's syntax set (via `two-face`), so anything bat
-colours, revmark colours, from TypeScript and TSX to Swift, Dart and
+colours, unau colours, from TypeScript and TSX to Swift, Dart and
 Dockerfiles. Files are matched by extension, then by name. In Vue, Svelte,
 Astro and HTML files, `<script>` and `<style>` blocks are coloured in their own
 language (`lang="ts"`, `lang="scss"` and so on), and so is Astro's `---`
 frontmatter.
 
-Each theme brings its own syntax colours. The Catppuccin ones use the official
-[catppuccin/bat](https://github.com/catppuccin/bat) themes, bundled under
-`assets/themes/` with their MIT notice. Colours follow Catppuccin's style
-guide: lavender for the focused border, overlay0 for the others, green and red
+Each theme brings its own syntax colours. The Catppuccin, Tokyo Night and Rosé
+Pine ones are the official syntax themes, bundled under `assets/themes/` with
+their licenses; the others are bat's, through `two-face`. Every family's own
+palette fills the interface the way Catppuccin's style guide places colours: lavender for the focused border, overlay0 for the others, green and red
 for added and removed lines, peach for the omitted-lines separator. Diff
 backgrounds are the accent blended over the base colour, since a terminal has no
 transparency.
 
-Slots for `[theme.colors]`: `text`, `muted`, `subtle`, `border_active`,
+Every theme paints its own background, so a light theme reads right on a dark
+terminal and the other way round. Set `[ui] background = "terminal"` to keep
+your terminal's background instead, transparency and all; themes are then
+best matched to it.
+
+Slots for `[theme.colors]`: `background`, `text`, `muted`, `subtle`, `border_active`,
 `border_inactive`, `cursor_bg`, `selection_bg`, `note_bg`, `added`, `removed`,
 `added_bg`, `removed_bg`, `hunk`, `fix`, `question`, `suggestion`, `done`,
 `error`, `warning`, `info`. Values are `#rrggbb`. An unknown theme, slot, or
-colour stops revmark at startup with the name in the message.
+colour stops unau at startup with the name in the message.
 
 ### Your own theme
 
@@ -332,7 +409,7 @@ A theme is a folder in `themes/` next to your `config.toml`; the folder name is
 the theme name:
 
 ```
-~/.config/revmark/
+~/.config/unau/
   config.toml
   themes/
     gruvbox.dark/
@@ -363,7 +440,7 @@ dark = "gruvbox.dark"
 - Themes can extend each other. A chain that loops back on itself is refused.
 - The `.tmTheme` path must stay inside the theme folder.
 - Everything is read and checked once at startup. A bad slot, a bad colour, a
-  missing or unreadable `.tmTheme`, or an unknown `extends` stops revmark and
+  missing or unreadable `.tmTheme`, or an unknown `extends` stops unau and
   names the theme and the problem.
 
 ### Running an agent
@@ -374,11 +451,11 @@ review file. Where it runs depends on `[run] in`:
 | `in` | Runs the command |
 |---|---|
 | `auto` (default) | in a new Herdr pane under Herdr, else a new tmux pane under tmux, else in the foreground |
-| `herdr` / `tmux` | always in a new pane of that one; an error if revmark isn't running inside it |
-| `pane` | in the background, its output streamed into a run pane under the diff; revmark stays usable |
-| `foreground` | revmark steps aside, runs it, and comes back when it exits |
+| `herdr` / `tmux` | always in a new pane of that one; an error if unau isn't running inside it |
+| `pane` | in the background, its output streamed into a run pane under the diff; unau stays usable |
+| `foreground` | unau steps aside, runs it, and comes back when it exits |
 
-A tmux pane opens to the right of revmark, which keeps the focus. The command is
+A tmux pane opens to the right of unau, which keeps the focus. The command is
 typed into the pane's shell, so the shell stays after the agent exits and its
 output stays readable. Inside tmux running in Herdr (or the other way round),
 `auto` picks Herdr; set `in` to choose.
@@ -387,7 +464,7 @@ output stays readable. Inside tmux running in Herdr (or the other way round),
 `claude -p "fix every open item in {file}"` or `codex exec …`: the command gets
 no terminal and no keyboard, its output (colours stripped) scrolls in the run
 pane, and the diff stays live while it works. One run at a time; pressing `r`
-again offers to stop it, and quitting revmark stops it too. For an agent you
+again offers to stop it, and quitting unau stops it too. For an agent you
 talk to while it works, use tmux, Herdr or the foreground.
 
 The run pane's title shows how long the command has been running, then how
@@ -398,7 +475,7 @@ more arrives.
 
 While the agent works, the review file is the progress report: the default
 instructions ask the agent to set `status: in-progress` first and to mark each
-item `[~]` before working on it. revmark shows those marks as `~` in the
+item `[~]` before working on it. unau shows those marks as `~` in the
 comments pane and the diff, and counts them in the status line
 (`2 open · 1 working`).
 
@@ -406,7 +483,7 @@ comments pane and the diff, and counts them in the status line
 
 Some agents print nothing until they finish when they have no terminal;
 `claude -p` prints only its final answer. To follow Claude as it works, have
-it stream its events and let revmark turn them into short lines:
+it stream its events and let unau turn them into short lines:
 
 ```toml
 [run]
@@ -458,5 +535,5 @@ MIT. Copyright (c) 2026 Konstantin Kai. Dependencies and bundled code and
 themes keep their own licenses; see
 [third-party notices](THIRD_PARTY_NOTICES.md) and `assets/notices/`.
 
-Run `revmark --licenses` to print every included license text and
+Run `unau --licenses` to print every included license text and
 attribution.

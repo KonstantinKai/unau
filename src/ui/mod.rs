@@ -4,26 +4,30 @@
 mod comments;
 mod confirm;
 mod diff;
+mod picker;
 mod prompt;
 mod runpane;
 
 use crate::{
     app::{AppState, Level, Pane},
-    config::Action,
+    config::{Action, Background},
     git::FileStatus,
-    theme::Colors,
+    theme::{Colors, blend},
     tree::Entry,
 };
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph},
 };
 
 pub fn render(state: &AppState, frame: &mut Frame) {
     let colors = &state.layout.theme.colors;
+    // The theme's own ground first, so its colours never sit on a terminal
+    // background of the other kind.
+    frame.render_widget(Block::new().style(surface(state, colors)), frame.area());
     let [main, status] =
         Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(frame.area());
     let diff_area = if state.layout.zoom {
@@ -49,9 +53,17 @@ pub fn render(state: &AppState, frame: &mut Frame) {
     runpane::render(state, frame, run_area, colors);
     diff::render(state, frame, diff_area, colors);
     prompt::render(state, frame, diff_area, main, colors);
+    // A yes/no question or the help takes the whole screen's attention; the
+    // comment popup and the theme picker leave it bright, since what is
+    // behind them is the point.
+    if state.confirm.is_some() {
+        dim(state, frame, main, colors);
+    }
     confirm::render(state, frame, main, colors);
+    picker::render(state, frame, main, colors);
     render_status(state, frame, status, colors);
     if state.help {
+        dim(state, frame, frame.area(), colors);
         render_help(state, frame, colors);
     }
 }
@@ -79,6 +91,50 @@ pub fn pane_title(state: &AppState, action: Action, text: &str, colors: &Colors)
     ])
 }
 
+/// The ground everything is drawn on: the theme's background, or nothing so
+/// the terminal's shows through.
+pub fn surface(state: &AppState, colors: &Colors) -> Style {
+    match state.config.background {
+        Background::Theme => Style::new().bg(colors.background),
+        Background::Terminal => Style::new(),
+    }
+}
+
+/// How strongly a popup's surface is tinted with the accent, in percent.
+const RAISED_PERCENT: u16 = 14;
+
+/// Columns of space between a popup's border and its text, on each side.
+pub const POPUP_PADDING: u16 = 1;
+
+/// A popup's frame: a surface raised off the screen by an accent tint, a
+/// rounded border in `accent`, and a cell of padding each side, so it reads
+/// as on top of whatever is behind it.
+pub fn popup_block<'a>(colors: &Colors, accent: Color) -> Block<'a> {
+    Block::new()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(accent))
+        .padding(Padding::horizontal(POPUP_PADDING))
+        .style(Style::new().fg(colors.text).bg(blend(
+            colors.border_active,
+            colors.background,
+            RAISED_PERCENT,
+        )))
+}
+
+/// Fades what is already drawn in `area`, for a popup that wants the
+/// screen's attention to itself.
+fn dim(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) {
+    let faded = Style::new()
+        .fg(colors.muted)
+        .remove_modifier(Modifier::BOLD);
+    let faded = match state.config.background {
+        Background::Theme => faded.bg(colors.background),
+        Background::Terminal => faded,
+    };
+    frame.buffer_mut().set_style(area, faded);
+}
+
 pub fn border(focused: bool, colors: &Colors) -> Style {
     Style::new().fg(if focused {
         colors.border_active
@@ -92,7 +148,12 @@ fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors)
     let block = Block::new()
         .borders(Borders::ALL)
         .border_style(border(focused, colors))
-        .title(pane_title(state, Action::FocusFiles, "files", colors));
+        .title(pane_title(
+            state,
+            Action::FocusFiles,
+            &files_title(state),
+            colors,
+        ));
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let open: Option<&str> = state.file.as_ref().and_then(|f| f.path());
@@ -138,6 +199,21 @@ fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors)
         })
         .collect();
     frame.render_widget(Paragraph::new(lines), inner);
+}
+
+/// `files`, then the filter and how many of the files it shows.
+fn files_title(state: &AppState) -> String {
+    let filter = &state.filter;
+    if !filter.is_set() && !filter.typing {
+        return "files".to_owned();
+    }
+    let caret = if filter.typing { "▏" } else { "" };
+    let count = if state.paths.is_empty() {
+        "no match".to_owned()
+    } else {
+        format!("{}/{}", state.paths.len(), state.all_paths)
+    };
+    format!("files · /{}{caret} {count}", filter.text)
 }
 
 /// The git status column before a file name; blank for a file that is only
@@ -244,7 +320,7 @@ fn disabled_in_range(action: Action) -> bool {
 
 fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
     let area = frame.area();
-    let width = area.width.min(72);
+    let width = area.width.min(72 + 2 * POPUP_PADDING);
     let height = area
         .height
         .min(u16::try_from(Action::ALL.len() + 4).unwrap_or(u16::MAX));
@@ -277,12 +353,8 @@ fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
         .collect();
     frame.render_widget(Clear, popup);
     frame.render_widget(
-        Paragraph::new(lines).block(
-            Block::new()
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(colors.border_active))
-                .title(" keys · any key closes "),
-        ),
+        Paragraph::new(lines)
+            .block(popup_block(colors, colors.border_active).title(" keys · any key closes ")),
         popup,
     );
 }
@@ -347,6 +419,27 @@ mod tests {
         f.git(&["add", "src"]);
         s.refresh().unwrap();
         assert_eq!(text(&s), " ✓");
+    }
+
+    #[test]
+    fn the_files_title_shows_the_filter_and_its_count() {
+        let f = repo();
+        let mut s = state(&f);
+        assert_eq!(files_title(&s), "files");
+        crate::app::tests::press(&mut s, "/a.r");
+        assert_eq!(files_title(&s), "files · /a.r▏ 1/1");
+        crate::app::tests::press(&mut s, "x");
+        assert_eq!(files_title(&s), "files · /a.rx▏ no match");
+    }
+
+    #[test]
+    fn the_theme_paints_the_ground_unless_the_terminal_is_asked_for() {
+        let f = repo();
+        let mut s = state(&f);
+        let colors = s.layout.theme.colors;
+        assert_eq!(surface(&s, &colors).bg, Some(colors.background));
+        s.config.merge("[ui]\nbackground = \"terminal\"\n").unwrap();
+        assert_eq!(surface(&s, &colors).bg, None);
     }
 
     #[test]
