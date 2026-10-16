@@ -44,10 +44,12 @@ person can all work from it.
 ## Install
 
 ```sh
+git clone https://github.com/KonstantinKai/unau
+cd unau
 cargo install --path .
 ```
 
-Needs `git` on `PATH`. unau shells out to it and links no git library.
+Needs Rust 1.92 or newer, and `git` on `PATH`. unau shells out to it and links no git library.
 
 ## Usage
 
@@ -58,7 +60,9 @@ unau main..HEAD      # a range; staging keys are off in range mode
 unau -- main         # a path called main, not the branch
 unau --review .unau/2026-10-14-00.md  # reopen a review
 unau --continue      # reopen the newest review; start a new one if there is none
-unau --out -         # print the review on exit instead of writing .unau/
+unau --out -         # print the review on exit instead of writing a review file
+unau ~/Dev/other     # the repository at that path
+unau --licenses      # print the license and third-party notices
 ```
 
 A path that exists wins over a revision with the same name; `--` forces the
@@ -76,7 +80,7 @@ the name, `●` marks unstaged lines, `✓` staged ones, `✎ n` the annotations
 and `✓` for the files under it, so a directory showing only `✓` is fully
 staged.
 
-unau never edits `.gitignore`. Add `.unau/` to it yourself if you don't
+unau never edits `.gitignore`. Add `.unau/*` to it yourself if you don't
 want reviews tracked, or keep reviews out of the repository altogether with
 `[review] dir`:
 
@@ -90,7 +94,8 @@ folder inside the repository is kept out of the diff like `.unau/` is. Set
 it in your own config for every repository, or in a repository's
 `.unau.toml` for that one; it takes effect the next time unau starts.
 `--continue` looks there, and the agent gets the full path in `{file}`. A
-repository's own `.unau/instructions.md` stays where it is.
+repository's `instructions.md` moves with it; `[review] instructions` points
+elsewhere.
 
 unau picks up where you left off. On quit it saves the open file and cursor
 line, the focused pane, folded directories, the files pane width, zoom and the
@@ -106,13 +111,13 @@ one small file per repository and never inside it; delete one to start clean.
 
 | Key | Action |
 |---|---|
-| `j` `k` | next / previous line |
+| `j` `k` (or `Down` `Up`) | next / previous line |
 | `J` `K` | next / previous block of changed lines (added or removed), even when it is close enough to the last one to share its hunk |
 | `gg` `G` | first / last line |
 | `Ctrl-e` `Ctrl-y` | scroll the diff one line; the cursor stays unless it would leave the screen |
 | `Ctrl-d` `Ctrl-u` | scroll the diff half a page down / up |
-| `Ctrl-f` `Ctrl-b` | scroll the diff a page down / up. The scroll keys move the diff from the files and comments panes too, without leaving them; in the run pane they scroll its output |
-| `h` `l` `Tab` | focus files / diff / cycle in pane-number order: files → diff → comments → run (shown panes only) |
+| `Ctrl-f` `Ctrl-b` | scroll the diff a page down / up |
+| `h` `l` (or `Left` `Right`) `Tab` | focus files / diff / cycle in pane-number order: files → diff → comments → run (shown panes only) |
 | `1` `2` `3` `4` | focus files / diff / comments / run pane (the last two shown if hidden); each pane's title starts with its number |
 | `Enter` | fold a directory, open a file; on a separator, expand |
 | `W` `E` | fold / unfold every directory (folding all leaves nested ones folded too) |
@@ -141,6 +146,10 @@ one small file per repository and never inside it; delete one to start clean.
 | `a` | accept a done item: stage its hunk, drop it from the review |
 | `Q` | quit; asks first in a popup, naming open items never run or a running command (`[ui] confirm_quit = false` to skip) |
 | `?` | help |
+
+The scroll keys (`Ctrl-e`/`Ctrl-y`, `Ctrl-d`/`Ctrl-u`, `Ctrl-f`/`Ctrl-b`) move
+the diff from the files and comments panes too, without leaving them; in the
+run pane they scroll its output.
 
 Comments are typed in a popup that floats just under the lines you selected
 (above them when there's no room), so the code stays in view. Its title shows
@@ -221,9 +230,9 @@ files:
 Reopen with `--review <file>`. A ticked item shows its quoted lines against
 what is there now. `a` stages the hunks that touch it and removes it from the
 file. `c` pushes back: the item becomes a new open one with your comment. A
-file that changed since the review was written carries a `Δ` in the file tree. When
-nothing is open and nothing is left unstaged, unau says the review is
-complete.
+file that changed since the review was written carries a `Δ` in the file
+tree. When nothing is open and nothing is left unstaged, unau says the review
+is complete.
 
 If the agent rewrote every quoted line and nothing changed at the anchor,
 unau marks the item "anchor lost"; stage the fix by hand and delete the item.
@@ -244,15 +253,6 @@ Press `i` to edit the file in effect. If there is none yet, unau creates
 the global one with the default text, so there is something to start from. To
 give one repository its own instructions, put an `instructions.md` in its
 review folder. On its own it replaces the global file and the default.
-To keep them somewhere else, point `[review] instructions` at the file, in
-the repository's `.unau.toml` or your own config (a relative path starts at
-the repository root, `~/` and `{repo}` work as in `dir`):
-
-```toml
-[review]
-instructions = "docs/agents/review.md"
-```
-
 To add to them instead, put a line `{inherit}` where the inherited text should
 go:
 
@@ -265,6 +265,16 @@ In a repository file, `{inherit}` brings in the global file (or the default
 when there is none); in the global file, it brings in the default. Levels
 chain, so a repository file can extend a global file that extends the default,
 and updates to either reach every repository that inherits them.
+
+To keep a repository's instructions somewhere else, point
+`[review] instructions` at the file, in the repository's `.unau.toml` or your
+own config (a relative path starts at the repository root, `~/` and `{repo}`
+work as in `dir`):
+
+```toml
+[review]
+instructions = "docs/agents/review.md"
+```
 
 The text is copied into a review when the review file is created. Editing the
 instructions later changes new reviews only: a review the agent may already
@@ -303,9 +313,11 @@ things keep them working:
 - Run `pnpm test` before ticking an item.
 ```
 
-`.unau/` is usually ignored by git, so a repository's instructions stay on
-your machine. To share them with your team, un-ignore that one file
-(`!.unau/instructions.md`).
+With `.unau/*` in `.gitignore`, a repository's instructions stay on your
+machine. To share them with your team, add `!.unau/instructions.md` under it.
+That needs the `/*`: git never looks inside a folder ignored as `.unau/`, so
+nothing in it can be un-ignored. A file moved with `[review] dir` or
+`[review] instructions` is tracked or ignored wherever it lives.
 
 ## Configuration
 
@@ -330,8 +342,8 @@ background = "theme"         # theme | terminal (keep the terminal's own, transp
 
 [review]
 quote_lines = 12             # longer quotes keep their first & last 3 lines; 0 = never cap
-dir = ".unau"             # where reviews go (see below)
-# instructions = "docs/agents/review.md"   # this repo's agent instructions; default: instructions.md in dir
+dir = ".unau"                # where reviews go (see Usage)
+# instructions = "…"         # this repository's agent instructions; default: instructions.md in the review folder
 
 [theme]
 mode = "auto"                # auto | light | dark
@@ -365,7 +377,7 @@ Built in:
 | One Half | `onehalf.dark` | `onehalf.light` |
 | Tokyo Night | `tokyonight.night` | `tokyonight.day` |
 | Rosé Pine | `rosepine.main` | `rosepine.dawn` |
-| unau's first colours | `default.dark` | `default.light` |
+| Plain colours | `default.dark` | `default.light` |
 
 `mode = "auto"` picks the dark or light theme from the terminal background
 (`COLORFGBG`), falling back to dark.
@@ -387,10 +399,13 @@ frontmatter.
 Each theme brings its own syntax colours. The Catppuccin, Tokyo Night and Rosé
 Pine ones are the official syntax themes, bundled under `assets/themes/` with
 their licenses; the others are bat's, through `two-face`. Every family's own
-palette fills the interface the way Catppuccin's style guide places colours: lavender for the focused border, overlay0 for the others, green and red
-for added and removed lines, peach for the omitted-lines separator. Diff
-backgrounds are the accent blended over the base colour, since a terminal has no
-transparency.
+palette fills the interface the way Catppuccin's style guide places colours:
+lavender for the focused border, overlay0 for the others, green and red for
+added and removed lines, peach for the omitted-lines separator. Diff
+backgrounds are the accent blended over the base colour, since terminal
+colours have no alpha channel. Under the cursor or a selection, an added or
+removed line keeps a touch of its green or red, so you can still tell which
+it is without looking for the sign.
 
 Every theme paints its own background, so a light theme reads right on a dark
 terminal and the other way round. Set `[ui] background = "terminal"` to keep
@@ -528,6 +543,9 @@ the plain path.
 - [lazygit](https://github.com/jesseduffield/lazygit) by Jesse Duffield: the
   layout and line staging
 - [Catppuccin](https://github.com/catppuccin/catppuccin): the default themes
+- [Tokyo Night](https://github.com/folke/tokyonight.nvim) by Folke Lemaitre
+  (Apache 2.0) and [Rosé Pine](https://github.com/rose-pine/tm-theme) (MIT):
+  the bundled syntax themes, licenses in `assets/themes/`
 
 ## License
 

@@ -64,31 +64,32 @@ First release.
   re-read when the editor closes.
 - `[review] dir` moves review files out of `.unau/`, to another folder in
   the repository or outside it (`~/reviews/{repo}`), so a repository can stay
-  free of review files. A repository's `instructions.md` is read from that
-  folder too, and `[review] instructions` points at a file anywhere else.
+  free of review files.
 - `--licenses` prints unau's license and every third-party notice it
   carries, including those of the bundled syntax definitions and themes.
-- `--continue` reopens the newest review in `.unau/`, or starts a new one
-  when there is none.
+- `--continue` reopens the newest review in the review folder, or starts a
+  new one when there is none.
 - Every key can be rebound in `config.toml` or a repository `.unau.toml`.
   `,` opens your config in `$EDITOR`, and saved changes apply without a
   restart; a broken config is reported and the previous one kept.
-- Agent instructions at the top of every review, from
-  `.unau/instructions.md` in the repository, else
+- Agent instructions at the top of every review, from `instructions.md` in
+  the review folder (or the file `[review] instructions` names), else
   `~/.config/unau/instructions.md`, else a built-in default; `i` edits
   them. A review keeps the instructions it was created with. A `{inherit}`
   line extends the next level instead of replacing it.
 - Themes: Catppuccin Macchiato and Latte by default, with matching syntax
-  colours, picked by terminal background. Highlighting uses bat's syntax set,
-  so TypeScript, TSX, JSX, TOML, Vue, Swift, Kotlin, Dart, SCSS and
-  Dockerfiles are coloured too, script and style blocks in Vue, Svelte, Astro
-  and HTML files in their own language, and only the lines on screen are
-  highlighted; the earlier colours stay available
-  as `default.dark` and `default.light`. Any single colour can be overridden in
+  colours, picked by terminal background; plain colours are available as
+  `default.dark` and `default.light`. Any single colour can be overridden in
   `[theme.colors]`.
+- Syntax highlighting uses bat's syntax set, so TypeScript, TSX, JSX, TOML,
+  Vue, Swift, Kotlin, Dart, SCSS and Dockerfiles are coloured too, and script
+  and style blocks in Vue, Svelte, Astro and HTML files in their own language.
+  Only the lines on screen are highlighted, so long files open at once.
 - Seven more theme families: Gruvbox, Dracula, Nord, Solarized, One Half,
   Tokyo Night and Rosé Pine, each in its dark and light flavours where it has
   them.
+- The cursor and selection keep an added or removed line green or red, so a
+  selected line's kind shows without reading its sign.
 - Popups stand out: a raised, accent-tinted surface with a rounded border,
   and the screen behind a question or the help fades.
 - Themes paint their own background, so any theme works on any terminal;

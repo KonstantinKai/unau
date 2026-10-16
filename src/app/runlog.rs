@@ -75,7 +75,7 @@ pub fn clean_line(raw: &str) -> String {
             continue;
         }
         match chars.next() {
-            // CSI: parameters until a final byte in @..~.
+            // Control sequence (`ESC [`): parameters until a final byte in @..~.
             Some('[') => {
                 for c in chars.by_ref() {
                     if ('@'..='~').contains(&c) {
@@ -83,7 +83,8 @@ pub fn clean_line(raw: &str) -> String {
                     }
                 }
             }
-            // OSC: until BEL or the string terminator.
+            // Operating system command (`ESC ]`): until the bell or the string
+            // terminator.
             Some(']') => {
                 while let Some(c) = chars.next() {
                     if c == '\u{7}' || (c == '\u{1b}' && chars.next_if_eq(&'\\').is_some()) {

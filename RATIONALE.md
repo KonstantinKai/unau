@@ -1,7 +1,7 @@
 # unau — rationale
 
-Why unau is shaped the way it is. What it does, rule by rule, is in the spec;
-how to use it is in the README. This file changes when a decision does, not
+Why unau is shaped the way it is. What it does and how to use it is in the
+README; this file holds only the reasons. This file changes when a decision does, not
 with every feature.
 
 ## The itch
@@ -71,9 +71,10 @@ The review file's shape (a dated Markdown checklist with a frontmatter
 10. **Keyboard only, every key remappable.** No mouse: a review is a sequence
     of small, repeatable moves, and those belong on keys.
 11. **Writes stay in the review folder.** Apart from staging, discarding, the
-    files a person opens from inside unau, and a per-repository view session
-    in the user's state directory, unau writes nothing outside its review
-    folder and never touches `.gitignore`.
+    files a person opens from inside unau, the theme picked with `T` (saved to
+    the user's config), and a per-repository view session in the user's state
+    directory, unau writes nothing outside its review folder and never
+    touches `.gitignore`.
 12. **Themes like yazi's.** One named theme for dark backgrounds and one for
     light, overrides per colour on top. Every built-in family is a palette
     mapped onto the interface the way Catppuccin's style guide places colours,

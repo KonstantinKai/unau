@@ -90,7 +90,8 @@ impl AppState {
 
     /// `L`: show and focus the pane, focus it, or hide it.
     pub fn toggle_comments(&mut self) {
-        // The left column is hidden while the diff is zoomed.
+        // Zoom hides the pane, so unzoom to show it; but on the pane already
+        // focused, `L` means hide, and unzooming would undo that.
         if self.layout.zoom && !(self.comments.visible && self.focus == Pane::Comments) {
             self.layout.zoom = false;
             self.relayout();

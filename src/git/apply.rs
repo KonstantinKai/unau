@@ -1,4 +1,5 @@
-//! Line staging: synthesise a patch for the selected lines and hand it to
+//! Staging, unstaging and discarding. Whole files go to `git add`, `reset`
+//! and `checkout` in batches; selected lines get a synthesised patch for
 //! `git apply`, the way lazygit does it.
 
 use super::{FileDiff, Line, LineKind, Repo};

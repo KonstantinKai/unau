@@ -179,7 +179,7 @@ impl AppState {
         Effect::EditFile(path)
     }
 
-    /// After the editor closes on `path`: reload whatever it was.
+    /// After the editor closes: reload whichever settings file changed.
     /// Closing the editor without changing anything reloads nothing and says
     /// nothing.
     pub fn after_edit(&mut self) {

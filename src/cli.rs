@@ -20,11 +20,11 @@ pub struct Args {
     #[arg(long, value_name = "FILE", conflicts_with = "target")]
     pub review: Option<PathBuf>,
 
-    /// Reopen the newest review in `.unau/`; start a new one if there is none.
+    /// Reopen the newest review in the review folder (`.unau/` unless `[review] dir` moves it); start a new one if there is none.
     #[arg(long = "continue", conflicts_with_all = ["review", "target", "path", "out"])]
     pub resume: bool,
 
-    /// Print the review to stdout on exit instead of writing `.unau/`. Only `-` is accepted.
+    /// Print the review to stdout on exit instead of writing a review file. Only `-` is accepted.
     #[arg(long, value_name = "-")]
     pub out: Option<String>,
 

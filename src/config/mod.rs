@@ -1,5 +1,5 @@
-//! `config.toml` (user) and `.unau.toml` (repository): key bindings, the
-//! run command, theme, gutter and quote length.
+//! `config.toml` (user) and `.unau.toml` (repository), read in that order:
+//! the repository file overrides the user's, setting by setting.
 
 mod keys;
 mod template;

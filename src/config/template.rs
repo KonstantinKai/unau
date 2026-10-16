@@ -41,10 +41,10 @@ pub fn template() -> String {
         "# quote_lines = {DEFAULT_QUOTE_LINES}               # longer quotes keep their first & last lines; 0 = never cap"
     );
     text.push_str(
-        "# dir = \".unau\"               # where reviews go: relative to the repo, ~/…, or absolute; {repo} = repo folder name\n",
+        "# dir = \".unau\"               # where reviews go: relative to the repository, ~/…, or absolute; {repo} = its folder name\n",
     );
     text.push_str(
-        "# instructions = \".unau/instructions.md\"  # the repo's agent instructions file; default: instructions.md in dir\n",
+        "# instructions = \"…\"           # this repository's agent instructions file; default: instructions.md in the review folder\n",
     );
     text.push_str("\n[theme]\n# mode = \"auto\"                  # auto | light | dark\n");
     let _ = writeln!(text, "# dark = \"{}\"", defaults.dark_name);

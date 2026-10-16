@@ -84,8 +84,7 @@ fn scrolled(
 }
 
 impl AppState {
-    /// `C-e`, `C-y`, `C-d`, `C-u`, `C-f`, `C-b` in whichever pane has focus.
-    /// The scroll keys move the diff from the files and comments panes too,
+    /// `C-e`, `C-y`, `C-d`, `C-u`, `C-f`, `C-b`. The scroll keys move the diff from the files and comments panes too,
     /// so a file can be read without leaving the list it was picked from.
     /// The run pane keeps them: they are how its output is paged.
     pub fn scroll(&mut self, by: Scroll, down: bool) {
@@ -222,7 +221,6 @@ impl AppState {
         }
     }
 
-    /// Reveals more of the file around the gap under the cursor.
     /// Reveals hidden lines near the cursor. On a separator both its edges
     /// grow; anywhere else the nearest separator grows from the edge facing
     /// the cursor, so the code next to what you are reading appears.

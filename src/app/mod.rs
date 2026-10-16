@@ -204,7 +204,6 @@ pub struct AppState {
     pub config_files: ConfigFiles,
     /// Output and status of the latest background run.
     pub run_log: Option<RunLog>,
-    /// The comments pane under the files pane.
     pub comments: CommentsPane,
     /// The theme picker, while it is open.
     pub theme_picker: Option<ThemePicker>,

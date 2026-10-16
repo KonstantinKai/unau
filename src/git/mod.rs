@@ -15,7 +15,8 @@ use std::{
     process::{Command, Output, Stdio},
 };
 
-/// Directory the review files live in, relative to the repository root.
+/// Default review folder, relative to the repository root; `[review] dir`
+/// moves it.
 pub const REVIEW_DIR: &str = ".unau";
 
 /// The SHA-1 of git's empty tree, used as the parent of a root commit.
@@ -87,7 +88,7 @@ impl Repo {
         self.reviews.clone()
     }
 
-    /// The review dir as a path inside the repository, when it is inside.
+    /// The review folder as a path inside the repository, when it is inside.
     pub fn review_dir_in_tree(&self) -> Option<String> {
         let inside = self.reviews.strip_prefix(&self.root).ok()?;
         let inside = inside.to_string_lossy().replace('\\', "/");
