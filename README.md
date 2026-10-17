@@ -109,9 +109,10 @@ elsewhere.
 Changes made outside unau show up within about a second: an agent editing in
 another pane, your usual editor, `git add` in another shell. While you are
 typing a comment or have lines selected, unau waits until you finish, so the
-lines don't move under you. While another window has focus it stops checking
-and catches up the moment you come back (under tmux this needs
-`set -g focus-events on`; without it, unau simply keeps checking).
+lines don't move under you. While you are in another pane, tab or app it
+stops checking and catches up the moment you come back. That needs a terminal
+or multiplexer that reports focus; under tmux, add `set -g focus-events on`.
+Without focus reports, unau simply keeps checking.
 
 unau picks up where you left off. On quit it saves the open file and cursor
 line, the focused pane, folded directories, the files pane width, zoom and the
