@@ -20,7 +20,7 @@
 
 ## 0.1.0 - 2026-10-16
 
-## First release
+First release: terminal code review that ends in a Markdown file an agent can act on.
 
 ### Added
 
