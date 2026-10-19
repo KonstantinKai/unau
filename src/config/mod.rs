@@ -44,11 +44,12 @@ fn resolve_path(path: Option<&str>, root: &Path, home: Option<&Path>) -> Option<
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RunIn {
-    /// Herdr if inside Herdr, else tmux if inside tmux, else the foreground.
+    /// Herdr if inside Herdr, else tmux, else zellij, else the foreground.
     #[default]
     Auto,
     Herdr,
     Tmux,
+    Zellij,
     /// In the background, output in a pane inside unau.
     Pane,
     Foreground,
@@ -100,6 +101,9 @@ pub struct Config {
     /// Key sequence to action. Every action has at least one binding.
     pub keys: BTreeMap<Vec<Key>, Action>,
     pub run: Option<String>,
+    /// `[run] send`: typed into the agent's pane on every `r` after the first,
+    /// while that pane is still open.
+    pub run_send: Option<String>,
     /// Where the run command goes: a multiplexer pane or the foreground.
     pub run_in: RunIn,
     pub run_output: RunOutput,
@@ -161,6 +165,7 @@ enum Binding {
 #[serde(deny_unknown_fields)]
 struct RunSection {
     command: Option<String>,
+    send: Option<String>,
     #[serde(rename = "in")]
     run_in: Option<RunIn>,
     output: Option<RunOutput>,
@@ -193,6 +198,7 @@ impl Default for Config {
         Self {
             keys,
             run: None,
+            run_send: None,
             run_in: RunIn::Auto,
             run_output: RunOutput::Plain,
             line_numbers: LineNumbers::Both,
@@ -264,6 +270,14 @@ impl Config {
         self.validate()?;
         if let Some(command) = file.run.command {
             self.run = Some(command);
+        }
+        if let Some(send) = file.run.send {
+            // A newline would press Enter in the agent's prompt halfway
+            // through the message.
+            if send.contains(['\n', '\r']) {
+                bail!("[run] send must be one line");
+            }
+            self.run_send = Some(send);
         }
         if let Some(run_in) = file.run.run_in {
             self.run_in = run_in;
@@ -456,6 +470,22 @@ mod tests {
             config.theme(true).colors.text,
             theme::CATPPUCCIN_MACCHIATO.colors.text
         );
+    }
+
+    #[test]
+    fn send_is_read_and_must_be_one_line() {
+        let mut config = Config::default();
+        config
+            .merge("[run]\nsend = \"fix every open item in {file}\"\n")
+            .unwrap();
+        assert_eq!(
+            config.run_send.as_deref(),
+            Some("fix every open item in {file}")
+        );
+        let err = config
+            .merge("[run]\nsend = \"\"\"\nfirst\nsecond\"\"\"\n")
+            .unwrap_err();
+        assert!(err.to_string().contains("one line"), "{err:#}");
     }
 
     #[test]

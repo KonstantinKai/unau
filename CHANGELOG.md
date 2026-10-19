@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `r` runs the command in a new zellij pane when unau runs inside zellij
+  (`[run] in = "zellij"` to force it). Focus stays on unau, and the pane
+  keeps the command's output and exit code after it finishes.
+- `[run] send`: with it set, the first `r` opens the agent's pane and every
+  later `r` types the message into that same pane, so the agent keeps its
+  session and its context from round to round instead of starting over.
+
 ### Fixed
 
 - Edits made outside unau, by an agent in another pane, another editor or

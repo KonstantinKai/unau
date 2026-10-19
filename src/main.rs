@@ -223,8 +223,12 @@ fn event_loop(tui: &mut terminal::Tui, state: &mut AppState) -> Result<()> {
                     state.info("command stopped");
                 }
             }
-            Effect::Run { command, place } => {
-                start_run(tui, state, &mut background, &command, place)?;
+            Effect::Run {
+                command,
+                place,
+                follow_up,
+            } => {
+                start_run(tui, state, &mut background, &command, place, follow_up)?;
             }
         }
     }
@@ -253,30 +257,49 @@ fn start_run(
     background: &mut Option<run::Background>,
     command: &str,
     place: run::Place,
+    follow_up: Option<(run::AgentPane, String)>,
 ) -> Result<()> {
     let root = state.repo.root.clone();
-    let result = match place {
+    match place {
         run::Place::Pane => {
             state.run_started(command);
             match run::Background::start(command, &root) {
                 Ok(run) => *background = Some(run),
                 Err(err) => state.run_failed(format!("{err:#}")),
             }
-            return Ok(());
         }
-        run::Place::Herdr => run::in_herdr_pane(command, &root),
-        run::Place::Tmux => run::in_tmux_pane(command, &root),
-        run::Place::Foreground => terminal::suspend(tui, || run::foreground(command, &root))?,
-    };
-    match result {
-        Ok(()) if place == run::Place::Herdr => state.info("started in a new Herdr pane"),
-        Ok(()) if place == run::Place::Tmux => state.info("started in a new tmux pane"),
-        Ok(()) => {
-            state.poll_review();
-            refresh(state);
-            state.info("command finished");
+        run::Place::Foreground => {
+            match terminal::suspend(tui, || run::foreground(command, &root))? {
+                Ok(()) => {
+                    state.poll_review();
+                    refresh(state);
+                    state.info("command finished");
+                }
+                Err(err) => state.error(format!("{err:#}")),
+            }
         }
-        Err(err) => state.error(format!("{err:#}")),
+        run::Place::Herdr | run::Place::Tmux | run::Place::Zellij => {
+            if let Some((pane, text)) = follow_up
+                && run::pane_open(&pane)
+            {
+                match run::send_to_pane(&pane, &text) {
+                    Ok(()) => state.info("sent to the agent's pane"),
+                    Err(err) => state.error(format!("{err:#}")),
+                }
+                return Ok(());
+            }
+            match run::open_pane(place, command, &root) {
+                Ok(pane) => {
+                    state.agent_pane = Some(pane);
+                    state.info(match place {
+                        run::Place::Herdr => "started in a new Herdr pane",
+                        run::Place::Zellij => "started in a new zellij pane",
+                        _ => "started in a new tmux pane",
+                    });
+                }
+                Err(err) => state.error(format!("{err:#}")),
+            }
+        }
     }
     Ok(())
 }

@@ -218,9 +218,18 @@ impl AppState {
             return Effect::None;
         }
         self.ran = true;
+        // Typed into the agent's prompt, not a shell, so the path goes in as is.
+        let follow_up = self
+            .config
+            .run_send
+            .as_ref()
+            .zip(self.agent_pane.clone())
+            .filter(|(_, pane)| pane.place == place)
+            .map(|(send, pane)| (pane, send.replace("{file}", &file)));
         Effect::Run {
             command: command.replace("{file}", &shell_quote(&file)),
             place,
+            follow_up,
         }
     }
 
@@ -360,7 +369,7 @@ mod tests {
         s.config.run = Some("agent fix {file}".into());
         assert_eq!(press(&mut s, "r"), Effect::None);
         press(&mut s, "nsomething\n");
-        let Effect::Run { command, place } = press(&mut s, "r") else {
+        let Effect::Run { command, place, .. } = press(&mut s, "r") else {
             panic!("no run effect");
         };
         let path = s.review_path().unwrap().display().to_string();
@@ -382,6 +391,46 @@ mod tests {
                 .text
                 .contains("not a Herdr pane")
         );
+    }
+
+    #[test]
+    fn with_send_set_later_runs_go_to_the_agents_pane_as_typed_text() {
+        let f = repo();
+        let mut s = state(&f);
+        s.config.run = Some("claude".into());
+        s.config.run_send = Some("fix every open item in {file}".into());
+        s.multiplexers.tmux = true;
+        press(&mut s, "nsomething\n");
+        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+            panic!("no run effect");
+        };
+        assert_eq!(follow_up, None, "the first run opens the pane");
+        let pane = crate::run::AgentPane {
+            place: crate::run::Place::Tmux,
+            id: "%7".into(),
+        };
+        s.agent_pane = Some(pane.clone());
+        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+            panic!("no run effect");
+        };
+        // Typed at the agent's prompt, so the path is not quoted for a shell.
+        let path = s.review_path().unwrap().display().to_string();
+        assert_eq!(
+            follow_up,
+            Some((pane.clone(), format!("fix every open item in {path}")))
+        );
+        s.multiplexers.zellij = true;
+        s.config.run_in = crate::config::RunIn::Zellij;
+        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+            panic!("no run effect");
+        };
+        assert_eq!(follow_up, None, "a pane of another multiplexer is not used");
+        s.config.run_in = crate::config::RunIn::Tmux;
+        s.config.run_send = None;
+        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+            panic!("no run effect");
+        };
+        assert_eq!(follow_up, None, "without send every run opens a pane");
     }
 
     #[test]

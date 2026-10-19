@@ -28,7 +28,8 @@ pub fn template() -> String {
     text.push_str(
         "\n[run]\n\
          # command = \"claude 'fix every open item in {file}'\"\n\
-         # in = \"auto\"                    # auto | herdr | tmux | pane | foreground\n\
+         # send = \"fix every open item in {file}\"  # later r presses type this into the agent's pane; one line\n\
+         # in = \"auto\"                    # auto | herdr | tmux | zellij | pane | foreground\n\
          # output = \"plain\"               # plain | claude-stream (run pane; command needs -p --output-format stream-json --verbose)\n\
          \n[ui]\n\
          # line_numbers = \"both\"          # both | new\n\
@@ -41,10 +42,10 @@ pub fn template() -> String {
         "# quote_lines = {DEFAULT_QUOTE_LINES}               # longer quotes keep their first & last lines; 0 = never cap"
     );
     text.push_str(
-        "# dir = \".unau\"               # where reviews go: relative to the repository, ~/…, or absolute; {repo} = its folder name\n",
+        "# dir = \".unau\"                  # where reviews go: relative to the repository, ~/…, or absolute; {repo} = its folder name\n",
     );
     text.push_str(
-        "# instructions = \"…\"           # this repository's agent instructions file; default: instructions.md in the review folder\n",
+        "# instructions = \"…\"             # this repository's agent instructions file; default: instructions.md in the review folder\n",
     );
     text.push_str("\n[theme]\n# mode = \"auto\"                  # auto | light | dark\n");
     let _ = writeln!(text, "# dark = \"{}\"", defaults.dark_name);

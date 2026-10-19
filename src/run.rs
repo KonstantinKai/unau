@@ -1,9 +1,11 @@
-//! The configured run command: in a new Herdr or tmux pane when the tool runs
-//! inside one, otherwise in the foreground while the interface is suspended.
+//! The configured run command: in a new Herdr, tmux or zellij pane when the
+//! tool runs inside one, otherwise in the foreground while the interface is
+//! suspended.
 
 use crate::config::RunIn;
 use anyhow::{Context, Result, bail};
 use std::{
+    ffi::{OsStr, OsString},
     io::{BufRead, BufReader, Read},
     path::Path,
     process::{Child, Command, Stdio},
@@ -16,6 +18,7 @@ use std::{
 pub enum Place {
     Herdr,
     Tmux,
+    Zellij,
     /// In the background, output shown in unau's run pane.
     Pane,
     Foreground,
@@ -28,6 +31,8 @@ pub struct Multiplexers {
     pub herdr: bool,
     /// `TMUX` is set, as tmux does in every pane.
     pub tmux: bool,
+    /// `ZELLIJ` is set, as zellij does in every pane.
+    pub zellij: bool,
 }
 
 impl Multiplexers {
@@ -35,19 +40,23 @@ impl Multiplexers {
         Self {
             herdr: std::env::var("HERDR_ENV").is_ok_and(|v| v == "1"),
             tmux: std::env::var_os("TMUX").is_some_and(|v| !v.is_empty()),
+            zellij: std::env::var_os("ZELLIJ").is_some(),
         }
     }
 }
 
-/// Picks where to run. `auto` prefers Herdr, then tmux; when both are around
-/// the environment cannot say which is innermost, so `[run] in` decides.
+/// Picks where to run. `auto` prefers Herdr, then tmux, then zellij; when
+/// more than one is around the environment cannot say which is innermost, so
+/// `[run] in` decides.
 pub fn place(run_in: RunIn, around: Multiplexers) -> Result<Place, String> {
     let wanted = match run_in {
         RunIn::Auto if around.herdr => Place::Herdr,
         RunIn::Auto if around.tmux => Place::Tmux,
+        RunIn::Auto if around.zellij => Place::Zellij,
         RunIn::Auto | RunIn::Foreground => Place::Foreground,
         RunIn::Herdr => Place::Herdr,
         RunIn::Tmux => Place::Tmux,
+        RunIn::Zellij => Place::Zellij,
         RunIn::Pane => Place::Pane,
     };
     match wanted {
@@ -57,17 +66,122 @@ pub fn place(run_in: RunIn, around: Multiplexers) -> Result<Place, String> {
         Place::Tmux if !around.tmux => {
             Err("[run] in = \"tmux\", but this is not a tmux pane".to_owned())
         }
+        Place::Zellij if !around.zellij => {
+            Err("[run] in = \"zellij\", but this is not a zellij pane".to_owned())
+        }
         place => Ok(place),
     }
 }
 
+/// A multiplexer pane that `r` opened for the agent, by the id its
+/// multiplexer gave it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentPane {
+    pub place: Place,
+    pub id: String,
+}
+
+/// Opens a new pane in `place` running `command` and returns it. `place` is
+/// one of the multiplexers; the run pane and the foreground have no pane.
+pub fn open_pane(place: Place, command: &str, cwd: &Path) -> Result<AgentPane> {
+    let id = match place {
+        Place::Herdr => in_herdr_pane(command, cwd)?,
+        Place::Tmux => tmux_split(command, cwd, &[], None)?,
+        Place::Zellij => in_zellij_pane(command, cwd)?,
+        Place::Pane | Place::Foreground => bail!("{place:?} runs have no pane"),
+    };
+    Ok(AgentPane { place, id })
+}
+
+/// Whether `pane` is still there to type into. A zellij pane whose command
+/// has exited is kept on screen but counts as gone: Enter there would start
+/// the command again instead of reaching the agent.
+pub fn pane_open(pane: &AgentPane) -> bool {
+    let output = |program: &str, args: &[&str]| {
+        Command::new(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+    };
+    match pane.place {
+        Place::Tmux => output(
+            "tmux",
+            &["display-message", "-p", "-t", &pane.id, "#{pane_dead}"],
+        )
+        .is_some_and(|dead| dead.trim() == "0"),
+        Place::Herdr => output("herdr", &["pane", "get", &pane.id]).is_some(),
+        Place::Zellij => output("zellij", &["action", "list-panes", "--json", "--state"])
+            .is_some_and(|json| zellij_pane_open(&json, &pane.id)),
+        Place::Pane | Place::Foreground => false,
+    }
+}
+
+/// Whether the terminal pane `id` (`terminal_3`) is listed in zellij's
+/// `list-panes --json --state` output with its command still running.
+fn zellij_pane_open(json: &str, id: &str) -> bool {
+    let Some(number) = id
+        .strip_prefix("terminal_")
+        .and_then(|n| n.parse::<u64>().ok())
+    else {
+        return false;
+    };
+    let Ok(serde_json::Value::Array(panes)) = serde_json::from_str(json) else {
+        return false;
+    };
+    panes.iter().any(|p| {
+        p["is_plugin"] == false
+            && p["id"].as_u64() == Some(number)
+            && p["exited"] != true
+            && p["is_held"] != true
+    })
+}
+
+/// Types `text` into the agent's pane and presses Enter, as if it were typed
+/// at the agent's prompt.
+pub fn send_to_pane(pane: &AgentPane, text: &str) -> Result<()> {
+    let run = |program: &str, args: &[&str]| -> Result<()> {
+        let output = Command::new(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .output()
+            .with_context(|| format!("run {program}"))?;
+        if !output.status.success() {
+            bail!(
+                "{program} {} failed: {}",
+                args.first().unwrap_or(&""),
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+        }
+        Ok(())
+    };
+    let id = pane.id.as_str();
+    match pane.place {
+        Place::Tmux => run("tmux", &["send-keys", "-t", id, "-l", text])?,
+        Place::Herdr => run("herdr", &["pane", "send-text", id, text])?,
+        Place::Zellij => run("zellij", &["action", "write-chars", "--pane-id", id, text])?,
+        Place::Pane | Place::Foreground => bail!("{:?} runs have no pane", pane.place),
+    }
+    // Agents that take a quick burst of characters for a paste would read an
+    // Enter inside that burst as a new line rather than as sending it.
+    std::thread::sleep(ENTER_DELAY);
+    match pane.place {
+        Place::Tmux => run("tmux", &["send-keys", "-t", id, "Enter"]),
+        Place::Herdr => run("herdr", &["pane", "send-keys", id, "enter"]),
+        Place::Zellij => run("zellij", &["action", "write", "--pane-id", id, "13"]),
+        Place::Pane | Place::Foreground => Ok(()),
+    }
+}
+
+/// The pause between typing a follow-up and pressing Enter.
+const ENTER_DELAY: Duration = Duration::from_millis(150);
+
 /// Splits the current tmux pane to the right and types `command` into the new
 /// pane's shell. Focus stays on the tool, and the shell outlives the command
 /// so its output stays readable.
-pub fn in_tmux_pane(command: &str, cwd: &Path) -> Result<()> {
-    tmux_split(command, cwd, &[], None).map(|_| ())
-}
-
+///
 /// `server` adds arguments before the subcommand (a test socket) and `target`
 /// names the pane to split when not running inside it. Returns the new pane id.
 fn tmux_split(command: &str, cwd: &Path, server: &[&str], target: Option<&str>) -> Result<String> {
@@ -107,8 +221,8 @@ fn tmux_split(command: &str, cwd: &Path, server: &[&str], target: Option<&str>) 
 }
 
 /// Splits the current Herdr pane and runs `command` in the new one. Returns
-/// immediately; the interface keeps running.
-pub fn in_herdr_pane(command: &str, cwd: &Path) -> Result<()> {
+/// the new pane's id at once; the interface keeps running.
+fn in_herdr_pane(command: &str, cwd: &Path) -> Result<String> {
     let output = Command::new("herdr")
         .args([
             "pane",
@@ -139,7 +253,48 @@ pub fn in_herdr_pane(command: &str, cwd: &Path) -> Result<()> {
             String::from_utf8_lossy(&status.stderr).trim()
         );
     }
-    Ok(())
+    Ok(pane)
+}
+
+/// Opens a zellij pane to the right running `command`, then gives focus back
+/// to the tool. zellij keeps the pane after the command exits, with its output
+/// and exit code, and Enter runs it again.
+///
+/// Unlike tmux, the command is not typed into a shell: zellij starts a new
+/// pane's terminal after `new-pane` returns, and characters written before it
+/// is up are lost.
+fn in_zellij_pane(command: &str, cwd: &Path) -> Result<String> {
+    let zellij = |args: &[&OsStr]| -> Result<String> {
+        let output = Command::new("zellij")
+            .args(args)
+            .output()
+            .context("run zellij")?;
+        if !output.status.success() {
+            bail!(
+                "zellij action {} failed: {}",
+                args.get(1)
+                    .map_or_else(String::new, |a| a.to_string_lossy().into_owned()),
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    };
+    let args = zellij_new_pane(command, cwd);
+    // `new-pane` prints the new pane's id, `terminal_<n>`.
+    let pane = zellij(&args.iter().map(OsString::as_os_str).collect::<Vec<_>>())?;
+    zellij(&["action", "move-focus", "left"].map(OsStr::new))?;
+    Ok(pane)
+}
+
+/// Arguments to `zellij` for a pane to the right of this one, in `cwd`,
+/// running `command` through `sh` like every other place a run goes.
+fn zellij_new_pane(command: &str, cwd: &Path) -> Vec<OsString> {
+    let mut args: Vec<OsString> = ["action", "new-pane", "--direction", "right", "--cwd"]
+        .map(OsString::from)
+        .to_vec();
+    args.push(cwd.as_os_str().to_owned());
+    args.extend(["--", "sh", "-c", command].map(OsString::from));
+    args
 }
 
 /// The new pane's id from `herdr pane split` output: `.result.pane.pane_id`.
@@ -282,21 +437,40 @@ mod tests {
     }
 
     #[test]
-    fn auto_prefers_herdr_then_tmux_and_forced_places_must_exist() {
+    fn auto_prefers_herdr_then_tmux_then_zellij_and_forced_places_must_exist() {
         let none = Multiplexers::default();
-        let tmux = Multiplexers {
-            herdr: false,
-            tmux: true,
+        let tmux = Multiplexers { tmux: true, ..none };
+        let zellij = Multiplexers {
+            zellij: true,
+            ..none
         };
-        let both = Multiplexers {
+        let all = Multiplexers {
             herdr: true,
             tmux: true,
+            zellij: true,
         };
         assert_eq!(place(RunIn::Auto, none), Ok(Place::Foreground));
         assert_eq!(place(RunIn::Auto, tmux), Ok(Place::Tmux));
-        assert_eq!(place(RunIn::Auto, both), Ok(Place::Herdr));
-        assert_eq!(place(RunIn::Tmux, both), Ok(Place::Tmux));
-        assert_eq!(place(RunIn::Foreground, both), Ok(Place::Foreground));
+        assert_eq!(place(RunIn::Auto, zellij), Ok(Place::Zellij));
+        assert_eq!(
+            place(
+                RunIn::Auto,
+                Multiplexers {
+                    herdr: false,
+                    ..all
+                }
+            ),
+            Ok(Place::Tmux)
+        );
+        assert_eq!(place(RunIn::Auto, all), Ok(Place::Herdr));
+        assert_eq!(place(RunIn::Tmux, all), Ok(Place::Tmux));
+        assert_eq!(place(RunIn::Zellij, all), Ok(Place::Zellij));
+        assert_eq!(place(RunIn::Foreground, all), Ok(Place::Foreground));
+        assert!(
+            place(RunIn::Zellij, tmux)
+                .unwrap_err()
+                .contains("not a zellij pane")
+        );
         assert!(
             place(RunIn::Tmux, none)
                 .unwrap_err()
@@ -307,6 +481,41 @@ mod tests {
                 .unwrap_err()
                 .contains("not a Herdr pane")
         );
+    }
+
+    #[test]
+    fn a_zellij_pane_opens_to_the_right_in_the_repository_running_the_command_through_sh() {
+        let args = zellij_new_pane("claude 'fix {x}'", Path::new("/work/my repo"));
+        let args: Vec<_> = args.iter().map(|a| a.to_string_lossy()).collect();
+        assert_eq!(
+            args,
+            [
+                "action",
+                "new-pane",
+                "--direction",
+                "right",
+                "--cwd",
+                "/work/my repo",
+                "--",
+                "sh",
+                "-c",
+                "claude 'fix {x}'"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_zellij_pane_counts_as_open_only_while_its_command_runs() {
+        let json = r#"[
+            {"id": 1, "is_plugin": true, "exited": false, "is_held": false},
+            {"id": 1, "is_plugin": false, "exited": false, "is_held": false},
+            {"id": 2, "is_plugin": false, "exited": true, "is_held": true}
+        ]"#;
+        assert!(zellij_pane_open(json, "terminal_1"));
+        assert!(!zellij_pane_open(json, "terminal_2"), "exited and held");
+        assert!(!zellij_pane_open(json, "terminal_3"), "not listed");
+        assert!(!zellij_pane_open(json, "plugin_1"));
+        assert!(!zellij_pane_open("not json", "terminal_1"));
     }
 
     /// Runs against a private tmux server, so no real session is touched.

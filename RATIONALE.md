@@ -57,11 +57,12 @@ The review file's shape (a dated Markdown checklist with a frontmatter
    person can do the work, and nothing breaks when an agent changes its API.
    Display helpers for one agent's output (Claude's stream) stay optional
    filters on what the command prints.
-7. **Run in a pane, not an embedded terminal.** `r` opens a tmux or Herdr pane
-   when unau runs in one, else steps aside for the foreground, or streams a
-   non-interactive agent into a run pane. An embedded terminal for interactive
-   agents was rejected: that is a terminal multiplexer, which tmux and Herdr
-   already are, and it would put child processes inside the state.
+7. **Run in a pane, not an embedded terminal.** `r` opens a tmux, zellij or
+   Herdr pane when unau runs in one, else steps aside for the foreground, or
+   streams a non-interactive agent into a run pane. An embedded terminal for
+   interactive agents was rejected: that is a terminal multiplexer, which
+   tmux, zellij and Herdr already are, and it would put child processes inside
+   the state.
 8. **`git` shelled out, never linked.** Line staging is `git apply --cached` on
    a patch built for the selection, the way lazygit does it. No `git2`: the
    `git` on the machine already has every behaviour the user expects.

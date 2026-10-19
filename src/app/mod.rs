@@ -122,6 +122,9 @@ pub enum Effect {
     Run {
         command: String,
         place: crate::run::Place,
+        /// The agent's pane from an earlier run and the line to type into
+        /// it; the pane is used instead of a new one if it is still open.
+        follow_up: Option<(crate::run::AgentPane, String)>,
     },
     /// Open `$EDITOR` on a settings file (config or instructions), then
     /// reload it.
@@ -209,6 +212,8 @@ pub struct AppState {
     pub config_files: ConfigFiles,
     /// Output and status of the latest background run.
     pub run_log: Option<RunLog>,
+    /// The multiplexer pane the last `r` opened, where a follow-up goes.
+    pub agent_pane: Option<crate::run::AgentPane>,
     pub comments: CommentsPane,
     /// The theme picker, while it is open.
     pub theme_picker: Option<ThemePicker>,
@@ -257,6 +262,7 @@ impl AppState {
             window_focused: true,
             config_files: ConfigFiles::default(),
             run_log: None,
+            agent_pane: None,
             comments: CommentsPane::default(),
             theme_picker: None,
             filter: FileFilter::default(),

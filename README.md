@@ -33,8 +33,8 @@ person can all work from it.
    code, `C` the whole file, `n` a general note. Each one is written to the
    review file the moment you make it, anchored to new-side lines with the code
    quoted.
-3. **Hand off.** `r` runs your agent on the review file, in a tmux or Herdr
-   pane, the foreground, or the run pane inside unau. The agent marks the
+3. **Hand off.** `r` runs your agent on the review file, in a tmux, zellij or
+   Herdr pane, the foreground, or the run pane inside unau. The agent marks the
    item it is on `[~]`, ticks it `[x]` with a note when done, and never stages.
 4. **Re-review.** unau picks the ticks up live (or later with `--continue`).
    Each ticked item shows its quoted lines against the code now. `a` accepts:
@@ -349,7 +349,8 @@ top = "gg"                   # a sequence; C-x for Ctrl, Tab, Enter, Esc, Space,
 
 [run]
 command = "claude 'fix every open item in {file}'"
-in = "auto"                  # auto | herdr | tmux | pane | foreground
+# send = "fix every open item in {file}"   # later r presses type this into the agent's pane
+in = "auto"                  # auto | herdr | tmux | zellij | pane | foreground
 output = "plain"             # plain | claude-stream (run pane, see below)
 
 [ui]
@@ -482,22 +483,47 @@ review file. Where it runs depends on `[run] in`:
 
 | `in` | Runs the command |
 |---|---|
-| `auto` (default) | in a new Herdr pane under Herdr, else a new tmux pane under tmux, else in the foreground |
-| `herdr` / `tmux` | always in a new pane of that one; an error if unau isn't running inside it |
+| `auto` (default) | in a new Herdr pane under Herdr, else a new tmux pane under tmux, else a new zellij pane under zellij, else in the foreground |
+| `herdr` / `tmux` / `zellij` | always in a new pane of that one; an error if unau isn't running inside it |
 | `pane` | in the background, its output streamed into a run pane under the diff; unau stays usable |
 | `foreground` | unau steps aside, runs it, and comes back when it exits |
 
 A tmux pane opens to the right of unau, which keeps the focus. The command is
 typed into the pane's shell, so the shell stays after the agent exits and its
-output stays readable. Inside tmux running in Herdr (or the other way round),
-`auto` picks Herdr; set `in` to choose.
+output stays readable. A zellij pane also opens to the right and hands the
+focus back to unau; zellij runs the command itself rather than typing it into
+a shell, and keeps the pane open when it exits, with its output and exit code
+(Enter runs it again). When unau runs inside more than one of these, `auto`
+picks Herdr, then tmux, then zellij; set `in` to choose.
+
+To keep working with one agent session instead of starting a new one on every
+`r`, set `send`:
+
+```toml
+[run]
+command = "claude 'fix every open item in {file}'"   # the first r: opens the pane
+send = "fix every open item in {file}"               # every later r: typed into it
+```
+
+The first `r` opens the pane as usual. Every later `r` types `send` into that
+same pane and presses Enter, as if you had typed it at the agent's prompt, so
+the agent keeps what it learned in earlier rounds: what it changed, what failed,
+what you told it. A follow-up is quicker and costs fewer tokens than a fresh
+start. If the pane is gone, or zellij shows its command as exited, `r` opens a
+new one. `send` must be one line (a new line would send the message early), and
+`{file}` goes in as a plain path, since it is read by the agent, not a shell.
+It applies to Herdr, tmux and zellij panes, not to `pane` or `foreground` runs.
+
+unau can't tell whether the agent is still running in the pane: if you quit
+the agent but keep the pane, the next `r` types the message into the shell
+there. Close the pane and `r` starts over.
 
 `in = "pane"` suits an agent's non-interactive mode, such as
 `claude -p "fix every open item in {file}"` or `codex exec …`: the command gets
 no terminal and no keyboard, its output (colours stripped) scrolls in the run
 pane, and the diff stays live while it works. One run at a time; pressing `r`
 again offers to stop it, and quitting unau stops it too. For an agent you
-talk to while it works, use tmux, Herdr or the foreground.
+talk to while it works, use tmux, zellij, Herdr or the foreground.
 
 The run pane's title shows how long the command has been running, then how
 long it took. `4` focuses it (so does `Tab`, after the diff and comments):
