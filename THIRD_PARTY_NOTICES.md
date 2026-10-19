@@ -1475,7 +1475,7 @@ SOFTWARE.
 
 Used by:
 
-- unau 0.1.0
+- unau 0.2.0
 
 ~~~~text
 MIT License
@@ -1660,7 +1660,7 @@ SOFTWARE.
 
 Used by:
 
-- unau 0.1.0
+- unau 0.2.0
 
 ~~~~text
 MIT License
@@ -2359,7 +2359,7 @@ SOFTWARE.
 
 Used by:
 
-- unau 0.1.0
+- unau 0.2.0
 
 ~~~~text
 The Rose Pine syntax themes (rosepine-main.tmTheme, rosepine-dawn.tmTheme)
@@ -2392,7 +2392,7 @@ SOFTWARE.
 
 Used by:
 
-- unau 0.1.0
+- unau 0.2.0
 
 ~~~~text
 The side-by-side row pairing in src/diff/rows.rs is adapted from annodiff

@@ -195,7 +195,7 @@ cursor, `Ctrl-u` everything before it, and `Ctrl-a` jumps to the start.
 
 ````md
 ---
-tool: unau 0.1.0
+tool: unau 0.2.0
 status: open
 base: HEAD
 files:
