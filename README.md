@@ -18,6 +18,14 @@ plain Markdown, and the hand-off is a command line you configure with `{file}`
 in it, so Claude Code, Codex, Aider, Gemini CLI, a script of your own or a
 person can all work from it.
 
+## Demo
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/KonstantinKai/unau/main/assets/demo.gif" target="_blank">
+    <img alt="unau in use: stage a new file, comment on two lines of a TypeScript change, run the agent in the run pane, then accept each fix it ticked until the review is complete." src="https://raw.githubusercontent.com/KonstantinKai/unau/main/assets/demo.gif">
+  </a>
+</p>
+
 ## How to work with unau
 
 <a href="https://raw.githubusercontent.com/KonstantinKai/unau/main/assets/workflow-light.png">
