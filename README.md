@@ -165,8 +165,8 @@ one small file per repository and never inside it; delete one to start clean.
 | `/` | filter the files pane by path, live and ignoring case; `Enter` keeps it, `Esc` clears it. Staging a folder then takes only the files shown |
 | `L` | comments pane under the files pane: every comment in one list; moving through it shows each one in the diff, `Enter` jumps there. `L` again hides it |
 | `v` | start or end a selection |
-| `s` `u` `d` | stage, unstage, discard: in the diff, the selection or the hunk under the cursor; in the files pane, the whole file, or every file under a directory (`d` asks) |
-| `gs` `gu` `gd` | stage, unstage, discard the whole open file from any pane (`gd` asks). Staging a whole file or directory (`gs`, or `s` in the files pane) moves on to the next file that still has unstaged changes |
+| `s` `u` `d` | stage, unstage, discard: in the diff, the selection or the hunk under the cursor, then the cursor moves on to the next change; in the files pane, the whole file, or every file under a directory (`d` asks) |
+| `gs` `gu` `gd` | stage, unstage, discard the whole open file from any pane (`gd` asks). Staging a whole file or directory (`gs`, or `s` in the files pane) moves on to the next file that still has unstaged changes, opening its folder if it is folded |
 | `c` | comment on the selection or line; on a done item, push back |
 | `S` | suggest replacement code in `$EDITOR` |
 | `C` | comment on the file |

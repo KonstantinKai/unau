@@ -275,6 +275,47 @@ impl AppState {
         };
         self.relayout();
     }
+
+    /// After lines are staged, unstaged or discarded: the diff cursor on the
+    /// first change left in a `kind` section at or after new-side `line`,
+    /// else the last one before it, else the row nearest `line`. The rows are
+    /// rebuilt by then, so the row the cursor was on now shows something else.
+    pub(super) fn cursor_to_next_change(&mut self, kind: crate::git::SectionKind, line: usize) {
+        let Some(file) = &self.file else {
+            return;
+        };
+        let changes: Vec<(usize, usize)> = (0..file.view.rows.len())
+            .filter_map(|row| {
+                let Row::Code { section, lines } = file.view.rows[row] else {
+                    return None;
+                };
+                let section = file.sections.get(section)?;
+                let changed = lines.iter().flatten().any(|i| {
+                    section
+                        .diff
+                        .lines
+                        .get(*i)
+                        .is_some_and(crate::git::Line::is_change)
+                });
+                (section.kind == kind && changed).then_some(row)
+            })
+            .filter_map(|row| Some((self.row_line(row)?, row)))
+            .collect();
+        let target = changes
+            .iter()
+            .find(|(at, _)| *at >= line)
+            .or(changes.last())
+            .map(|(_, row)| *row);
+        match target {
+            Some(row) => {
+                if let Some(file) = &mut self.file {
+                    file.cursor = row;
+                }
+            }
+            None => self.put_cursor_near(line),
+        }
+        self.scroll_to_cursor();
+    }
 }
 
 #[cfg(test)]
@@ -402,6 +443,46 @@ mod tests {
             .replace("line 50\n", "line fifty\n");
         f.write("a.txt", &changed);
         f
+    }
+
+    /// Text of the line under the diff cursor, and its section's kind.
+    fn under_cursor(s: &AppState) -> (String, crate::git::SectionKind) {
+        let file = s.file.as_ref().unwrap();
+        let Row::Code { section, lines } = file.view.rows[file.cursor] else {
+            panic!("cursor not on code");
+        };
+        let at = lines.iter().flatten().next().unwrap();
+        let section = &file.sections[section];
+        (section.diff.lines[*at].text.clone(), section.kind)
+    }
+
+    #[test]
+    fn staging_lines_puts_the_cursor_on_the_next_change_left_to_review() {
+        use crate::git::SectionKind::Unstaged;
+        // First change staged: the cursor goes on to the next one, below,
+        // not to whatever row now sits where the staged one was.
+        let f = long_change();
+        let mut s = state(&f);
+        s.focus = Pane::Diff;
+        assert_eq!(under_cursor(&s), ("line 10".to_owned(), Unstaged));
+        press(&mut s, "s");
+        assert_eq!(under_cursor(&s), ("line 50".to_owned(), Unstaged));
+        // Last change staged: nothing follows, so the cursor goes back to
+        // the nearest edge of the change before it, its added line.
+        let f = long_change();
+        let mut s = state(&f);
+        s.focus = Pane::Diff;
+        press(&mut s, "J");
+        press(&mut s, "J");
+        assert_eq!(under_cursor(&s).0, "line 50");
+        press(&mut s, "s");
+        assert_eq!(under_cursor(&s), ("line ten".to_owned(), Unstaged));
+        // A selection of lines behaves the same as a hunk.
+        let f = long_change();
+        let mut s = state(&f);
+        s.focus = Pane::Diff;
+        press(&mut s, "vjvs");
+        assert_eq!(under_cursor(&s), ("line 50".to_owned(), Unstaged));
     }
 
     #[test]

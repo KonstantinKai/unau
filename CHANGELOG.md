@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- After staging a whole file, unau moved on to the next file with unstaged
+  changes only if its row was showing: one inside a folded folder was
+  skipped. It now opens the folder and lands on that file.
+- After staging, unstaging or discarding a hunk or selected lines, the cursor
+  landed on an unrelated line, often context just above the next change, and
+  the view jumped with it. It now lands on the next change still to review,
+  or the one before when none follows.
+- Code past the first 256 lines of a file, or just after an "unchanged lines
+  omitted" gap, was coloured as if the file started there, so inside a class
+  `private` lost its keyword colour, and strings and comments could bleed.
+  Highlighting now parses from the top of the file, so everything is coloured
+  in context. A jump of more than 2,000 lines at once, such as `G` in a very
+  long file, still starts nearer the line, and becomes exact once you scroll
+  there.
+
 ## 0.3.0 - 2026-10-19
 
 ### Added

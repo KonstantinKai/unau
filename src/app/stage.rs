@@ -214,6 +214,9 @@ impl AppState {
                 _ => requests.last().and_then(|r| self.tree_index(&r.path)),
             })
             .flatten();
+        // Lines move between sections, so the cursor's row number will point
+        // at something else; its line is where to look for the next change.
+        let resume = (!first.whole_file).then(|| self.cursor_line()).flatten();
         let mut done = Vec::new();
         let mut failed = None;
         if requests.iter().all(|r| r.whole_file) {
@@ -259,6 +262,9 @@ impl AppState {
         {
             self.select_next_unstaged(row);
         }
+        if let Some(line) = resume {
+            self.cursor_to_next_change(wanted(first.change), line);
+        }
         if let Some(err) = failed {
             self.error(err);
         } else if self.message.is_none() {
@@ -275,24 +281,59 @@ impl AppState {
 
 impl AppState {
     /// Moves the files-pane cursor, and the diff with it, to the first file
-    /// row after `row` that still has unstaged changes, wrapping to the top.
-    /// Stays put when no file has any left.
+    /// after `row` that still has unstaged changes, wrapping to the top. A
+    /// folded directory holding such a file is unfolded on the way, and only
+    /// the directories on the way are. Stays put when no file has any left.
     fn select_next_unstaged(&mut self, row: usize) {
-        let len = self.tree.len();
-        let next = (1..=len)
-            .map(|step| (row + step) % len)
-            .find(|r| match &self.tree[*r].entry {
-                Entry::File(i) => self
-                    .snapshot
-                    .find(&self.paths[*i])
-                    .is_some_and(|f| self.snapshot.files[f].has_unstaged()),
-                Entry::Dir { .. } => false,
-            });
-        if let Some(next) = next {
-            self.tree_cursor = next;
-            self.open_under_cursor();
-            self.scroll_to_cursor();
+        let mut from = row;
+        // Each pass selects a file or unfolds one directory, and the tree has
+        // finitely many folded directories, so this ends.
+        loop {
+            let len = self.tree.len();
+            if len == 0 {
+                return;
+            }
+            let hit =
+                (1..=len)
+                    .map(|step| (from + step) % len)
+                    .find_map(|r| match &self.tree[r].entry {
+                        Entry::File(i) if self.has_unstaged(&self.paths[*i]) => Some((r, None)),
+                        Entry::Dir { path, folded: true } if self.unstaged_under(path) => {
+                            Some((r, Some(path.clone())))
+                        }
+                        Entry::File(_) | Entry::Dir { .. } => None,
+                    });
+            match hit {
+                None => return,
+                Some((at, None)) => {
+                    self.tree_cursor = at;
+                    self.open_under_cursor();
+                    self.scroll_to_cursor();
+                    return;
+                }
+                // Unfolding adds rows below the directory only, so it keeps
+                // its index and the search goes on from its first child.
+                Some((at, Some(dir))) => {
+                    self.folded.remove(&dir);
+                    self.rebuild_tree();
+                    from = at;
+                }
+            }
         }
+    }
+
+    fn has_unstaged(&self, path: &str) -> bool {
+        self.snapshot
+            .find(path)
+            .is_some_and(|f| self.snapshot.files[f].has_unstaged())
+    }
+
+    /// Whether a file shown in the files pane under `dir` has unstaged changes.
+    fn unstaged_under(&self, dir: &str) -> bool {
+        let prefix = format!("{dir}/");
+        self.paths
+            .iter()
+            .any(|p| p.starts_with(&prefix) && self.has_unstaged(p))
     }
 }
 
@@ -489,6 +530,24 @@ mod tests {
         // A hunk stage keeps the file.
         press(&mut s, "s");
         assert_eq!(open(&s).as_deref(), Some(files[1].as_str()));
+    }
+
+    #[test]
+    fn the_next_unstaged_file_is_found_in_folded_folders_and_they_open() {
+        let f = folder();
+        let mut s = state(&f);
+        let open = |s: &AppState| s.file.as_ref().and_then(|f| f.path()).map(str::to_owned);
+        s.focus = Pane::Tree;
+        press(&mut s, "W");
+        assert!(s.folded.contains("src") && s.folded.contains("src/deep"));
+        s.tree_cursor = s.tree_index("top.rs").unwrap();
+        s.open_under_cursor();
+        press(&mut s, "s");
+        // Wrapping to the top meets src/ folded, and src/deep/ folded in it:
+        // both open, and the cursor lands on the first file still unstaged.
+        assert_eq!(open(&s).as_deref(), Some("src/deep/b.rs"));
+        assert_eq!(s.tree_cursor, s.tree_index("src/deep/b.rs").unwrap());
+        assert!(s.folded.is_empty(), "{:?}", s.folded);
     }
 
     #[test]

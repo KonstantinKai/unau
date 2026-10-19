@@ -151,8 +151,7 @@ impl FileState {
             .filter_map(|row| row.section().map(|s| (s, row)))
             .flat_map(|(s, row)| row.lines().map(move |i| (s, i)))
             .collect();
-        self.highlight
-            .ensure(&path, &self.sections, &self.views, wanted, theme);
+        self.highlight.ensure(&path, &self.sections, wanted, theme);
     }
 }
 

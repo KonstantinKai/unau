@@ -6,7 +6,7 @@
 //! old-side state and added lines new-side state. The parser state at the end
 //! of what was highlighted is kept, so scrolling further continues from it.
 
-use super::{SectionView, embedded};
+use super::embedded;
 use crate::{
     git::{Line, LineKind, Section},
     theme::{LATTE_TMTHEME, MACCHIATO_TMTHEME, Syntax, Vendored},
@@ -43,9 +43,18 @@ static VENDORED: LazyLock<Vec<(Vendored, Option<Theme>)>> = LazyLock::new(|| {
 /// Syntect theme used when a bundled one fails to load.
 const FALLBACK: &str = "base16-ocean.dark";
 
-/// Longest stretch parsed from one starting point. A new file is a single run
-/// of visible lines; without this, jumping to its end would parse all of it.
-/// The cost is that a chunk starts with fresh parser state, like a hunk does.
+/// How far parsing catches up to reach a wanted line. A section is parsed from
+/// its start, hidden lines included, so every line is coloured knowing what
+/// came before it (inside a class, a string, a comment). Jumping further than
+/// this ahead of where parsing stopped, as `G` does in a very long file,
+/// starts at `HIGHLIGHT_CHUNK` before the line instead: quick, but blind to
+/// what came earlier until scrolling reaches it the long way.
+/// bat's TypeScript grammar parses roughly 5,000 to 8,000 lines a second,
+/// so this keeps the worst wait near a third of a second.
+pub const CATCH_UP: usize = 2_000;
+
+/// Where a jump past `CATCH_UP` starts parsing: the start of the line's
+/// stretch of this many lines.
 pub const HIGHLIGHT_CHUNK: usize = 256;
 
 fn load(bytes: &[u8]) -> Option<Theme> {
@@ -76,7 +85,7 @@ pub fn builtin_syntax_exists(name: &str) -> bool {
 pub type Spans = Vec<(Color, Range<usize>)>;
 
 /// Parser and highlighter state for one side of a diff.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct SideState {
     parse: ParseState,
     highlight: HighlightState,
@@ -131,7 +140,6 @@ impl Highlighting {
         &mut self,
         path: &str,
         sections: &[Section],
-        views: &[SectionView],
         wanted: impl IntoIterator<Item = (usize, usize)>,
         theme: &Syntax,
     ) {
@@ -162,7 +170,15 @@ impl Highlighting {
                 Some((start, None)) => (start, None),
                 None => (0, None),
             };
-            let start = run_start(&views[s].visible, i).max(block_start);
+            let parsed_to = self
+                .resume
+                .get(&(s, block_start))
+                .map_or(block_start, |r| r.next);
+            let start = if i.saturating_sub(parsed_to) <= CATCH_UP {
+                block_start
+            } else {
+                (i - i % HIGHLIGHT_CHUNK).max(block_start)
+            };
             let entry = targets
                 .entry((s, start))
                 .or_insert((i, block_language.unwrap_or(own)));
@@ -216,25 +232,18 @@ fn fresh(language: &SyntaxReference, highlighter: &Highlighter) -> SideState {
     }
 }
 
-/// Where parsing for line `i` starts: the first line of its run of visible
-/// lines, or of its chunk when the run is longer than one.
-fn run_start(visible: &[bool], i: usize) -> usize {
-    let floor = i - i % HIGHLIGHT_CHUNK;
-    let mut start = i;
-    while start > floor && visible.get(start - 1).copied().unwrap_or(false) {
-        start -= 1;
-    }
-    start
-}
-
 /// Advances the side states past `line` and returns its spans. A removed line
 /// is coloured by the old side, everything else by the new side.
 fn line_spans(line: &Line, sides: &mut [SideState; 2], highlighter: &Highlighter) -> Spans {
     let text = format!("{}\n", line.text);
     let mut spans = Spans::new();
+    // Through unchanged code both sides are in the same state, so the line is
+    // parsed once and the old side takes a copy: parsing is most of the cost
+    // of reaching a line deep in a file.
+    let shared = line.kind == LineKind::Context && sides[0] == sides[1];
     for (side, state) in sides.iter_mut().enumerate() {
         let on_side = match line.kind {
-            LineKind::Context => true,
+            LineKind::Context => !shared || side == 1,
             LineKind::Removed => side == 0,
             LineKind::Added => side == 1,
         };
@@ -260,6 +269,9 @@ fn line_spans(line: &Line, sides: &mut [SideState; 2], highlighter: &Highlighter
             }
             at += piece.len();
         }
+    }
+    if shared {
+        sides[0] = sides[1].clone();
     }
     spans
 }
@@ -292,18 +304,72 @@ mod tests {
     #[test]
     fn only_wanted_lines_are_highlighted_and_later_ones_continue() {
         let sections = section(20_000);
-        let views = crate::diff::section_views(&sections);
         let mut h = Highlighting::new("a.rs", &sections);
         let theme = Syntax::CatppuccinMacchiato;
-        h.ensure("a.rs", &sections, &views, (0..40).map(|i| (0, i)), &theme);
+        h.ensure("a.rs", &sections, (0..40).map(|i| (0, i)), &theme);
         assert_eq!(h.highlighted(), 40);
         assert!(!h.spans[0][39].is_empty() && h.spans[0][40].is_empty());
-        h.ensure("a.rs", &sections, &views, [(0, 60)], &theme);
+        h.ensure("a.rs", &sections, [(0, 60)], &theme);
         assert_eq!(h.highlighted(), 61);
-        // Jumping to the end of one long run parses only the last chunk.
-        h.ensure("a.rs", &sections, &views, [(0, 19_999)], &theme);
+        // Jumping further ahead than the catch-up limit parses only the
+        // stretch around the line, not everything before it.
+        h.ensure("a.rs", &sections, [(0, 19_999)], &theme);
         assert!(h.highlighted() <= 61 + HIGHLIGHT_CHUNK);
         assert!(!h.spans[0][19_999].is_empty());
+    }
+
+    /// A TypeScript class: `private` methods at lines 1 and 300, unchanged
+    /// filler between, with the methods themselves `kind`.
+    fn class_with_methods(kind: LineKind) -> Vec<Section> {
+        let mut texts = vec!["class A {".to_owned(), "  private a(): void {}".to_owned()];
+        texts.extend((0..298).map(|i| format!("  b{i} = 1;")));
+        texts.push("  private c(): void {}".to_owned());
+        texts.push("}".to_owned());
+        let lines = texts
+            .into_iter()
+            .enumerate()
+            .map(|(i, text)| Line {
+                kind: if i == 1 || i == 300 {
+                    kind
+                } else {
+                    LineKind::Context
+                },
+                old: (kind == LineKind::Context || (i != 1 && i != 300)).then_some(i + 1),
+                new: Some(i + 1),
+                text,
+                no_newline: false,
+            })
+            .collect();
+        vec![Section {
+            kind: SectionKind::Unstaged,
+            diff: FileDiff {
+                path: "a.ts".into(),
+                lines,
+                ..FileDiff::default()
+            },
+        }]
+    }
+
+    #[test]
+    fn code_far_down_a_file_is_coloured_with_everything_above_it_in_mind() {
+        let theme = Syntax::CatppuccinMacchiato;
+        let keyword = |h: &Highlighting, line: usize| {
+            h.spans[0][line]
+                .iter()
+                .find(|(_, range)| range.start == 2)
+                .map(|(colour, _)| *colour)
+        };
+        // Past the first 256 lines of one long run of visible lines, and
+        // after a stretch of unchanged lines hidden behind a separator: both
+        // used to start the parser afresh, outside the class.
+        for kind in [LineKind::Context, LineKind::Added] {
+            let sections = class_with_methods(kind);
+            let mut h = Highlighting::new("a.ts", &sections);
+            h.ensure("a.ts", &sections, [(0, 1)], &theme);
+            h.ensure("a.ts", &sections, [(0, 300)], &theme);
+            assert!(keyword(&h, 1).is_some());
+            assert_eq!(keyword(&h, 300), keyword(&h, 1), "{kind:?}");
+        }
     }
 
     #[test]
@@ -371,35 +437,23 @@ mod tests {
                 ..FileDiff::default()
             },
         }];
-        let views = crate::diff::section_views(&sections);
         let mut h = Highlighting::new("a.vue", &sections);
         // A line far past the chunk size, inside the script block.
-        h.ensure(
-            "a.vue",
-            &sections,
-            &views,
-            [(0, 500)],
-            &Syntax::CatppuccinMacchiato,
-        );
+        h.ensure("a.vue", &sections, [(0, 500)], &Syntax::CatppuccinMacchiato);
         let colours: std::collections::HashSet<_> =
             h.spans[0][500].iter().map(|(c, _)| *c).collect();
         assert!(colours.len() >= 3, "{:?}", h.spans[0][500]);
-        assert!(h.highlighted() <= HIGHLIGHT_CHUNK);
+        // Parsing starts at the script block, never in the template above it.
+        assert!(h.spans[0][1].is_empty());
+        assert!(!h.spans[0][5].is_empty());
     }
 
     #[test]
     fn typescript_lines_get_colours() {
         let mut sections = section(1);
         sections[0].diff.lines[0].text = "const x: number = 1;".into();
-        let views = crate::diff::section_views(&sections);
         let mut h = Highlighting::new("a.ts", &sections);
-        h.ensure(
-            "a.ts",
-            &sections,
-            &views,
-            [(0, 0)],
-            &Syntax::CatppuccinMacchiato,
-        );
+        h.ensure("a.ts", &sections, [(0, 0)], &Syntax::CatppuccinMacchiato);
         let colours: std::collections::HashSet<_> = h.spans[0][0].iter().map(|(c, _)| *c).collect();
         assert!(colours.len() > 1, "{:?}", h.spans[0][0]);
     }
@@ -407,12 +461,10 @@ mod tests {
     #[test]
     fn unknown_languages_stay_plain() {
         let sections = section(10);
-        let views = crate::diff::section_views(&sections);
         let mut h = Highlighting::new("a.unknownext", &sections);
         h.ensure(
             "a.unknownext",
             &sections,
-            &views,
             [(0, 3)],
             &Syntax::CatppuccinMacchiato,
         );
