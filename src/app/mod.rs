@@ -214,6 +214,8 @@ pub struct AppState {
     pub run_log: Option<RunLog>,
     /// The multiplexer pane the last `r` opened, where a follow-up goes.
     pub agent_pane: Option<crate::run::AgentPane>,
+    /// A newer release, once the background check has found one.
+    pub update: Option<crate::update::UpdateStatus>,
     pub comments: CommentsPane,
     /// The theme picker, while it is open.
     pub theme_picker: Option<ThemePicker>,
@@ -263,6 +265,7 @@ impl AppState {
             config_files: ConfigFiles::default(),
             run_log: None,
             agent_pane: None,
+            update: None,
             comments: CommentsPane::default(),
             theme_picker: None,
             filter: FileFilter::default(),

@@ -34,6 +34,7 @@ pub fn template() -> String {
          \n[ui]\n\
          # line_numbers = \"both\"          # both | new\n\
          # confirm_quit = true             # Q asks before quitting\n\
+         # check_updates = true            # look for a new release once a day; installer-script installs update themselves\n\
          # background = \"theme\"           # theme | terminal (keep the terminal's, transparency included)\n\
          \n[review]\n",
     );

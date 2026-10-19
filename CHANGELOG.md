@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- The status line shows unau's version at its right end, when there is room.
+- unau checks for a new release once a day. Installed with the installer
+  script, it updates itself in the background and asks for a restart;
+  installed with Homebrew or cargo, it shows the command to run.
+  `[ui] check_updates = false` turns it off.
+
 ### Fixed
 
 - unau used close to 300 MB after opening the files of an ordinary change set

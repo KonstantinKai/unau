@@ -117,6 +117,9 @@ pub struct Config {
     pub instructions: Option<String>,
     /// `Q` asks before quitting.
     pub confirm_quit: bool,
+    /// Check for a newer release once a day, and install it in the
+    /// background when unau came from its installer script.
+    pub check_updates: bool,
     pub background: Background,
     pub theme_mode: ThemeMode,
     /// Theme names as configured; a user theme may replace a built-in one.
@@ -176,6 +179,7 @@ struct RunSection {
 struct UiSection {
     line_numbers: Option<LineNumbers>,
     confirm_quit: Option<bool>,
+    check_updates: Option<bool>,
     background: Option<Background>,
 }
 
@@ -206,6 +210,7 @@ impl Default for Config {
             review_dir: None,
             instructions: None,
             confirm_quit: true,
+            check_updates: true,
             background: Background::Theme,
             theme_mode: ThemeMode::Auto,
             dark_name: theme::CATPPUCCIN_MACCHIATO.name.into_owned(),
@@ -293,6 +298,9 @@ impl Config {
         }
         if let Some(confirm) = file.ui.confirm_quit {
             self.confirm_quit = confirm;
+        }
+        if let Some(check) = file.ui.check_updates {
+            self.check_updates = check;
         }
         if let Some(dir) = file.review.dir {
             self.review_dir = Some(dir);

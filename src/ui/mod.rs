@@ -310,7 +310,43 @@ fn render_status(state: &AppState, frame: &mut Frame, area: Rect, colors: &Color
             Style::new().fg(colors.muted),
         )
     };
+    let used = line.width();
     frame.render_widget(Paragraph::new(line), area);
+    let notice = state
+        .update
+        .as_ref()
+        .map(crate::update::UpdateStatus::notice);
+    let (notice, version) = right_end(notice, used, area.width);
+    let Some(version) = version else {
+        return;
+    };
+    let mut spans = Vec::new();
+    if let Some(notice) = notice {
+        spans.push(Span::styled(notice, Style::new().fg(colors.done)));
+        spans.push(Span::styled(" · ", Style::new().fg(colors.muted)));
+    }
+    spans.push(Span::styled(version, Style::new().fg(colors.muted)));
+    let corner = Line::from(spans);
+    let width = u16::try_from(corner.width()).unwrap_or(area.width);
+    let corner_area = Rect {
+        x: area.x + area.width - width,
+        width,
+        ..area
+    };
+    frame.render_widget(Paragraph::new(corner), corner_area);
+}
+
+/// What fits at the status line's right end after the `used` columns, with a
+/// gap of two: the update notice and `v<version>`, else the version alone,
+/// else nothing. The status text always wins.
+fn right_end(notice: Option<String>, used: usize, width: u16) -> (Option<String>, Option<String>) {
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let fits = |columns: usize| used + 2 + columns <= usize::from(width);
+    match notice {
+        Some(notice) if fits(notice.len() + 3 + version.len()) => (Some(notice), Some(version)),
+        _ if fits(version.len()) => (None, Some(version)),
+        _ => (None, None),
+    }
 }
 
 /// Keys that do nothing in a commit or range.
@@ -385,6 +421,26 @@ mod tests {
         f.commit_all("init");
         f.write("src/a.rs", "fn a() { 1 }\nfn b() {}\n");
         f
+    }
+
+    #[test]
+    fn the_update_notice_and_version_give_way_to_the_status_text() {
+        let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+        let notice = "Update available, restart to update".to_owned();
+        let both = u16::try_from(40 + 2 + notice.len() + 3 + version.len()).unwrap();
+        assert_eq!(
+            right_end(Some(notice.clone()), 40, both),
+            (Some(notice.clone()), Some(version.clone()))
+        );
+        // One column short for both: the version stays, the notice goes.
+        assert_eq!(
+            right_end(Some(notice.clone()), 41, both),
+            (None, Some(version.clone()))
+        );
+        let room = u16::try_from(40 + 2 + version.len()).unwrap();
+        assert_eq!(right_end(None, 40, room), (None, Some(version)));
+        assert_eq!(right_end(None, 41, room), (None, None));
+        assert_eq!(right_end(Some(notice), 0, 5), (None, None));
     }
 
     #[test]

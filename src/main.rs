@@ -13,6 +13,7 @@ mod terminal;
 mod theme;
 mod tree;
 mod ui;
+mod update;
 
 use anyhow::Result;
 use app::{AppState, EditPurpose, Effect, Store};
@@ -145,8 +146,12 @@ fn event_loop(tui: &mut terminal::Tui, state: &mut AppState) -> Result<()> {
     // A run in the run pane: the process stays here, its output goes to the state.
     let mut background: Option<run::Background> = None;
     let mut watched = Instant::now();
+    let updates = state.config.check_updates.then(update::spawn);
     loop {
         pump(state, &mut background);
+        if let Some(status) = updates.as_ref().and_then(|u| u.try_recv().ok()) {
+            state.update = Some(status);
+        }
         terminal::draw(tui, |frame| ui::render(state, frame))?;
         if !event::poll(TICK)? {
             if state.poll_review() {

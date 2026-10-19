@@ -379,6 +379,7 @@ output = "plain"             # plain | claude-stream (run pane, see below)
 [ui]
 line_numbers = "both"        # both | new
 confirm_quit = true          # Q asks before quitting
+check_updates = true         # look for a new release once a day (see Updates)
 background = "theme"         # theme | terminal (keep the terminal's own, transparency included)
 
 [review]
@@ -591,6 +592,21 @@ lose their markers and get colour, code blocks show as code, and long lines
 wrap between words with list items indented under their text. Lines that are
 not stream events (stderr, or any other agent) pass through unchanged, so the
 setting is safe to leave on.
+
+### Updates
+
+unau checks for a new release once a day, in the background, with `curl`;
+an offline machine just gets no notice. When there is one, the right end of
+the status line says so in green, before the version:
+
+- **Installed with the installer script:** unau installs the update itself,
+  quietly, and says `Update available, restart to update`. Quit and start it
+  again; your place comes back with the session.
+- **Installed with Homebrew or cargo:** it shows the command to run, such as
+  `Update 0.3.0: brew upgrade unau`. unau never runs your package manager for
+  you.
+
+`[ui] check_updates = false` turns off both the check and the install.
 
 ### Editor
 
