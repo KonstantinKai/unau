@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- unau used close to 300 MB after opening the files of an ordinary change set
+  in TypeScript, since highlighting compiled each language's grammar into
+  large in-memory automata the first time it met it. Highlighting now uses
+  Oniguruma, as bat does: the same review stays near 30 MB and highlights
+  faster. Building from source now needs a C compiler.
+
 ## 0.2.0 - 2026-10-19
 
 ### Added

@@ -48,6 +48,7 @@ pub fn licenses() -> String {
     [
         include_str!("../LICENSE"),
         include_str!("../assets/notices/ANNODIFF-LICENSE"),
+        include_str!("../assets/notices/ONIGURUMA-LICENSE"),
         include_str!("../assets/themes/CATPPUCCIN-LICENSE"),
         include_str!("../assets/themes/TOKYONIGHT-LICENSE"),
         include_str!("../assets/themes/ROSEPINE-LICENSE"),

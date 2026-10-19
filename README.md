@@ -61,7 +61,9 @@ Pick one.
 brew install KonstantinKai/tap/unau
 ```
 
-**Cargo**, built from source (Rust 1.92 or newer):
+**Cargo**, built from source (Rust 1.92 or newer, and a C compiler for the
+bundled Oniguruma regex library: Xcode's command line tools on macOS, `gcc` or
+`clang` on Linux):
 
 ```sh
 cargo install unau
@@ -610,6 +612,8 @@ the plain path.
 - [Tokyo Night](https://github.com/folke/tokyonight.nvim) by Folke Lemaitre
   (Apache 2.0) and [Rosé Pine](https://github.com/rose-pine/tm-theme) (MIT):
   the bundled syntax themes, licenses in `assets/themes/`
+- [Oniguruma](https://github.com/kkos/oniguruma) by K. Kosako: the regular
+  expressions behind syntax highlighting (BSD 2-Clause, see `assets/notices/`)
 
 ## License
 
