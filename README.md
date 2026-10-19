@@ -45,20 +45,33 @@ person can all work from it.
 
 ## Install
 
+Pick one.
+
+**Homebrew** (macOS and Linux):
+
 ```sh
-brew install KonstantinKai/tap/unau                 # macOS and Linux
-cargo install unau                                  # from source, Rust 1.92 or newer
+brew install KonstantinKai/tap/unau
 ```
 
-Or a prebuilt binary for macOS or Linux (Intel or ARM), into `~/.cargo/bin`:
+**Cargo**, built from source (Rust 1.92 or newer):
 
 ```sh
-curl -LsSf https://github.com/KonstantinKai/unau/releases/latest/download/unau-installer.sh | sh
+cargo install unau
+```
+
+**Installer script**, a prebuilt binary for macOS or Linux (Intel or ARM),
+put in `~/.cargo/bin`:
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/KonstantinKai/unau/releases/latest/download/unau-installer.sh | sh
 ```
 
 The [releases page](https://github.com/KonstantinKai/unau/releases) has the
-archives and checksums. unau needs `git` on `PATH`. On Windows, use it inside
-WSL with the Linux build; there is no native Windows build yet. unau shells out to it and links no git library.
+archives and checksums.
+
+unau needs `git` on `PATH`: it shells out to it and links no git library. On
+Windows, use it inside WSL with the Linux build; there is no native Windows
+build yet.
 
 ## Usage
 
