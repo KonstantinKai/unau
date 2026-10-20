@@ -1,6 +1,6 @@
 [package]
 name = "unau"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.92"
 description = "Terminal code review that ends in a file an agent can act on"
