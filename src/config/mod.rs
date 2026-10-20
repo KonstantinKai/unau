@@ -66,6 +66,29 @@ pub enum RunOutput {
     ClaudeStream,
 }
 
+/// Whether `send` goes to an agent session the user started themselves.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Reuse {
+    /// Ask, and save the answer to the repository's `.unau.toml`.
+    #[default]
+    Ask,
+    /// Send to a running session; ask which only when there are several.
+    Session,
+    /// Always start a new session in a new pane.
+    New,
+}
+
+impl Reuse {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Session => "session",
+            Self::New => "new",
+        }
+    }
+}
+
 /// Which of the two configured themes is used.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -104,6 +127,8 @@ pub struct Config {
     /// `[run] send`: typed into the agent's pane on every `r` after the first,
     /// while that pane is still open.
     pub run_send: Option<String>,
+    /// `[run] reuse`: whether `send` may go to a session the user started.
+    pub run_reuse: Reuse,
     /// Where the run command goes: a multiplexer pane or the foreground.
     pub run_in: RunIn,
     pub run_output: RunOutput,
@@ -169,6 +194,7 @@ enum Binding {
 struct RunSection {
     command: Option<String>,
     send: Option<String>,
+    reuse: Option<Reuse>,
     #[serde(rename = "in")]
     run_in: Option<RunIn>,
     output: Option<RunOutput>,
@@ -203,6 +229,7 @@ impl Default for Config {
             keys,
             run: None,
             run_send: None,
+            run_reuse: Reuse::Ask,
             run_in: RunIn::Auto,
             run_output: RunOutput::Plain,
             line_numbers: LineNumbers::Both,
@@ -275,6 +302,9 @@ impl Config {
         self.validate()?;
         if let Some(command) = file.run.command {
             self.run = Some(command);
+        }
+        if let Some(reuse) = file.run.reuse {
+            self.run_reuse = reuse;
         }
         if let Some(send) = file.run.send {
             // A newline would press Enter in the agent's prompt halfway

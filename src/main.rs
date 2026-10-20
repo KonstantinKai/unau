@@ -1,3 +1,4 @@
+mod agents;
 mod app;
 mod claude_stream;
 mod cli;
@@ -231,9 +232,18 @@ fn event_loop(tui: &mut terminal::Tui, state: &mut AppState) -> Result<()> {
             Effect::Run {
                 command,
                 place,
-                follow_up,
+                send,
+                pane,
             } => {
+                let follow_up = FollowUp { send, pane };
                 start_run(tui, state, &mut background, &command, place, follow_up)?;
+            }
+            Effect::SendTo { pane, text } => match run::send_to_pane(&pane, &text) {
+                Ok(()) => state.info("sent to the agent's session"),
+                Err(err) => state.error(format!("{err:#}")),
+            },
+            Effect::OpenAgent { command, place } => {
+                open_agent(state, place, &command, &state.repo.root.clone());
             }
         }
     }
@@ -256,13 +266,21 @@ fn pump(state: &mut AppState, background: &mut Option<run::Background>) {
     }
 }
 
+/// What a run sends to an agent session that is already running.
+struct FollowUp {
+    /// `[run] send`, filled in; nothing is sent without it.
+    send: Option<String>,
+    /// The pane an earlier run used, tried before looking for others.
+    pane: Option<run::AgentPane>,
+}
+
 fn start_run(
     tui: &mut terminal::Tui,
     state: &mut AppState,
     background: &mut Option<run::Background>,
     command: &str,
     place: run::Place,
-    follow_up: Option<(run::AgentPane, String)>,
+    follow_up: FollowUp,
 ) -> Result<()> {
     let root = state.repo.root.clone();
     match place {
@@ -284,29 +302,60 @@ fn start_run(
             }
         }
         run::Place::Herdr | run::Place::Tmux | run::Place::Zellij => {
-            if let Some((pane, text)) = follow_up
-                && run::pane_open(&pane)
-            {
-                match run::send_to_pane(&pane, &text) {
-                    Ok(()) => state.info("sent to the agent's pane"),
-                    Err(err) => state.error(format!("{err:#}")),
+            if let Some(text) = follow_up.send {
+                // The pane this run already went to is the user's choice from
+                // before, so it goes there without asking.
+                if let Some(pane) = follow_up.pane.filter(run::pane_open) {
+                    match run::send_to_pane(&pane, &text) {
+                        Ok(()) => state.info("sent to the agent's pane"),
+                        Err(err) => state.error(format!("{err:#}")),
+                    }
+                    return Ok(());
                 }
-                return Ok(());
-            }
-            match run::open_pane(place, command, &root) {
-                Ok(pane) => {
-                    state.agent_pane = Some(pane);
-                    state.info(match place {
-                        run::Place::Herdr => "started in a new Herdr pane",
-                        run::Place::Zellij => "started in a new zellij pane",
-                        _ => "started in a new tmux pane",
-                    });
+                // A session the user started is used only once they said so:
+                // asked the first time, then as `[run] reuse` says.
+                let reuse = state.config.run_reuse;
+                let mut found = match reuse {
+                    config::Reuse::New => Vec::new(),
+                    config::Reuse::Ask | config::Reuse::Session => agents::agent_name(command)
+                        .map(|agent| agents::find(place, &agent, &root))
+                        .unwrap_or_default(),
+                };
+                if reuse == config::Reuse::Session && found.len() == 1 {
+                    let session = found.remove(0);
+                    match run::send_to_pane(&session.pane, &text) {
+                        Ok(()) => {
+                            state.agent_pane = Some(session.pane);
+                            state.info(format!("sent to {}", session.label));
+                        }
+                        Err(err) => state.error(format!("{err:#}")),
+                    }
+                    return Ok(());
                 }
-                Err(err) => state.error(format!("{err:#}")),
+                if !found.is_empty() {
+                    state.choose_agent(found, text, command.to_owned(), place);
+                    return Ok(());
+                }
             }
+            open_agent(state, place, command, &root);
         }
     }
     Ok(())
+}
+
+/// Starts the agent in a new multiplexer pane and remembers that pane.
+fn open_agent(state: &mut AppState, place: run::Place, command: &str, root: &Path) {
+    match run::open_pane(place, command, root) {
+        Ok(pane) => {
+            state.agent_pane = Some(pane);
+            state.info(match place {
+                run::Place::Herdr => "started in a new Herdr pane",
+                run::Place::Zellij => "started in a new zellij pane",
+                _ => "started in a new tmux pane",
+            });
+        }
+        Err(err) => state.error(format!("{err:#}")),
+    }
 }
 
 fn refresh(state: &mut AppState) {

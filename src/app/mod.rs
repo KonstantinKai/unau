@@ -1,6 +1,7 @@
 //! The state machine. `AppState` is plain data: it holds no terminal, no
 //! child process and no open handle, so every test builds one headless.
 
+mod agent_choice;
 mod annotate;
 mod comments;
 mod files;
@@ -17,6 +18,7 @@ mod runlog;
 mod settings;
 mod stage;
 
+pub use agent_choice::AgentChoice;
 pub use comments::{CommentRow, CommentsPane, label as comment_label};
 pub use files::{FileState, NoteLine, NoteStyle, Source, code_widths};
 pub use filter::FileFilter;
@@ -122,9 +124,22 @@ pub enum Effect {
     Run {
         command: String,
         place: crate::run::Place,
-        /// The agent's pane from an earlier run and the line to type into
-        /// it; the pane is used instead of a new one if it is still open.
-        follow_up: Option<(crate::run::AgentPane, String)>,
+        /// `[run] send` with the file filled in: typed into a running agent
+        /// session instead of starting a new one, when one is there.
+        send: Option<String>,
+        /// The agent's pane from an earlier run in this place, tried first.
+        pane: Option<crate::run::AgentPane>,
+    },
+    /// Type `text` into the agent session the user picked.
+    SendTo {
+        pane: crate::run::AgentPane,
+        text: String,
+    },
+    /// Start the agent in a new pane, as the user picked over the sessions
+    /// already running.
+    OpenAgent {
+        command: String,
+        place: crate::run::Place,
     },
     /// Open `$EDITOR` on a settings file (config or instructions), then
     /// reload it.
@@ -214,6 +229,8 @@ pub struct AppState {
     pub run_log: Option<RunLog>,
     /// The multiplexer pane the last `r` opened, where a follow-up goes.
     pub agent_pane: Option<crate::run::AgentPane>,
+    /// Several sessions run the agent here; the user picks one.
+    pub agent_choice: Option<AgentChoice>,
     /// A newer release, once the background check has found one.
     pub update: Option<crate::update::UpdateStatus>,
     pub comments: CommentsPane,
@@ -265,6 +282,7 @@ impl AppState {
             config_files: ConfigFiles::default(),
             run_log: None,
             agent_pane: None,
+            agent_choice: None,
             update: None,
             comments: CommentsPane::default(),
             theme_picker: None,

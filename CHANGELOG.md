@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `[run] send` reaches an agent session you started yourself, before unau:
+  `r` finds the pane running the agent in this repository (Herdr and tmux).
+  The first time, it asks whether to send there or start a new session, and
+  saves the answer as `[run] reuse` in the repository's `.unau.toml`; with
+  several sessions running it asks which one.
+
 ## 0.3.1 - 2026-10-20
 
 ### Fixed

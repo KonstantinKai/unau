@@ -14,6 +14,9 @@ impl AppState {
         if self.theme_picker.is_some() {
             return self.theme_picker_key(key);
         }
+        if self.agent_choice.is_some() {
+            return self.agent_choice_key(key);
+        }
         if self.filter.typing {
             return self.filter_key(key);
         }
@@ -219,17 +222,17 @@ impl AppState {
         }
         self.ran = true;
         // Typed into the agent's prompt, not a shell, so the path goes in as is.
-        let follow_up = self
+        let send = self
             .config
             .run_send
             .as_ref()
-            .zip(self.agent_pane.clone())
-            .filter(|(_, pane)| pane.place == place)
-            .map(|(send, pane)| (pane, send.replace("{file}", &file)));
+            .map(|send| send.replace("{file}", &file));
+        let pane = self.agent_pane.clone().filter(|pane| pane.place == place);
         Effect::Run {
             command: command.replace("{file}", &shell_quote(&file)),
             place,
-            follow_up,
+            send,
+            pane,
         }
     }
 
@@ -401,36 +404,35 @@ mod tests {
         s.config.run_send = Some("fix every open item in {file}".into());
         s.multiplexers.tmux = true;
         press(&mut s, "nsomething\n");
-        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+        // Typed at the agent's prompt, so the path is not quoted for a shell.
+        let path = s.review_path().unwrap().display().to_string();
+        let line = format!("fix every open item in {path}");
+        let Effect::Run { send, pane, .. } = press(&mut s, "r") else {
             panic!("no run effect");
         };
-        assert_eq!(follow_up, None, "the first run opens the pane");
-        let pane = crate::run::AgentPane {
+        assert_eq!(send.as_deref(), Some(line.as_str()));
+        assert_eq!(pane, None, "nothing remembered: a session is looked for");
+        let remembered = crate::run::AgentPane {
             place: crate::run::Place::Tmux,
             id: "%7".into(),
         };
-        s.agent_pane = Some(pane.clone());
-        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+        s.agent_pane = Some(remembered.clone());
+        let Effect::Run { pane, .. } = press(&mut s, "r") else {
             panic!("no run effect");
         };
-        // Typed at the agent's prompt, so the path is not quoted for a shell.
-        let path = s.review_path().unwrap().display().to_string();
-        assert_eq!(
-            follow_up,
-            Some((pane.clone(), format!("fix every open item in {path}")))
-        );
+        assert_eq!(pane, Some(remembered));
         s.multiplexers.zellij = true;
         s.config.run_in = crate::config::RunIn::Zellij;
-        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+        let Effect::Run { pane, .. } = press(&mut s, "r") else {
             panic!("no run effect");
         };
-        assert_eq!(follow_up, None, "a pane of another multiplexer is not used");
+        assert_eq!(pane, None, "a pane of another multiplexer is not used");
         s.config.run_in = crate::config::RunIn::Tmux;
         s.config.run_send = None;
-        let Effect::Run { follow_up, .. } = press(&mut s, "r") else {
+        let Effect::Run { send, .. } = press(&mut s, "r") else {
             panic!("no run effect");
         };
-        assert_eq!(follow_up, None, "without send every run opens a pane");
+        assert_eq!(send, None, "without send every run opens a pane");
     }
 
     #[test]

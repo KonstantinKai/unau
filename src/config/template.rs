@@ -29,6 +29,7 @@ pub fn template() -> String {
         "\n[run]\n\
          # command = \"claude 'fix every open item in {file}'\"\n\
          # send = \"fix every open item in {file}\"  # later r presses type this into the agent's pane; one line\n\
+         # reuse = \"ask\"                 # ask | session | new: send to an agent you started yourself? asked once, saved in .unau.toml\n\
          # in = \"auto\"                    # auto | herdr | tmux | zellij | pane | foreground\n\
          # output = \"plain\"               # plain | claude-stream (run pane; command needs -p --output-format stream-json --verbose)\n\
          \n[ui]\n\

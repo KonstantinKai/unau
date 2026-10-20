@@ -373,6 +373,7 @@ top = "gg"                   # a sequence; C-x for Ctrl, Tab, Enter, Esc, Space,
 [run]
 command = "claude 'fix every open item in {file}'"
 # send = "fix every open item in {file}"   # later r presses type this into the agent's pane
+# reuse = "ask"              # ask | session | new: use an agent session you started yourself
 in = "auto"                  # auto | herdr | tmux | zellij | pane | foreground
 output = "plain"             # plain | claude-stream (run pane, see below)
 
@@ -537,6 +538,25 @@ start. If the pane is gone, or zellij shows its command as exited, `r` opens a
 new one. `send` must be one line (a new line would send the message early), and
 `{file}` goes in as a plain path, since it is read by the agent, not a shell.
 It applies to Herdr, tmux and zellij panes, not to `pane` or `foreground` runs.
+
+It also works with an agent you started yourself, before unau. With `send` set
+and no pane of its own yet, `r` looks for panes running the program your
+`command` starts (its first word, `claude` above) in this repository: Herdr
+says which agent each pane runs, and in tmux unau looks at the processes under
+each pane's shell. unau never types into one of those unasked: the first time
+it finds any, it asks, listing them with `+ new session` below (`j`/`k`,
+`Enter`, `Esc`), and saves the answer as `[run] reuse` in the repository's
+`.unau.toml`, creating the file if needed:
+
+| `reuse` | `r` with your session running |
+|---|---|
+| `"ask"` (default) | asks, then saves `session` or `new` |
+| `"session"` | sends to it; asks which only when several run here |
+| `"new"` | starts a new session in a new pane, never looking |
+
+With none found, `r` opens a new pane as usual. The session it sends to is
+remembered for the rest of the run. zellij does not say what runs inside its
+panes, so there only a pane unau opened itself is reused.
 
 unau can't tell whether the agent is still running in the pane: if you quit
 the agent but keep the pane, the next `r` types the message into the shell

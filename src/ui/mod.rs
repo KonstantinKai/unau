@@ -1,6 +1,7 @@
 //! Drawing. Reads `&AppState` and never mutates it; every number it needs
 //! was computed in the update step.
 
+mod agent_choice;
 mod comments;
 mod confirm;
 mod diff;
@@ -56,10 +57,11 @@ pub fn render(state: &AppState, frame: &mut Frame) {
     // A yes/no question or the help takes the whole screen's attention; the
     // comment popup and the theme picker leave it bright, since what is
     // behind them is the point.
-    if state.confirm.is_some() {
+    if state.confirm.is_some() || state.agent_choice.is_some() {
         dim(state, frame, main, colors);
     }
     confirm::render(state, frame, main, colors);
+    agent_choice::render(state, frame, main, colors);
     picker::render(state, frame, main, colors);
     render_status(state, frame, status, colors);
     if state.help {
