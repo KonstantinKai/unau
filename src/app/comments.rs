@@ -299,6 +299,41 @@ mod tests {
     }
 
     #[test]
+    fn the_general_comments_stay_open_while_any_are_left() {
+        let f = repo();
+        let mut s = state(&f);
+        press(&mut s, "nfirst\n");
+        press(&mut s, "nsecond\n");
+        press(&mut s, "L");
+        let source = |s: &crate::app::AppState| s.file.as_ref().unwrap().source.clone();
+        assert_eq!(source(&s), Source::General);
+        // A re-read, as after an outside edit or a stage, keeps them open.
+        s.refresh().unwrap();
+        assert_eq!(source(&s), Source::General);
+        // Accepting one of two done items stays on the other.
+        for item in &mut s.review.items {
+            item.done = true;
+        }
+        s.reload_file();
+        let on_note = |s: &mut crate::app::AppState| {
+            let file = s.file.as_mut().unwrap();
+            file.cursor = (0..file.view.rows.len())
+                .find(|r| matches!(file.view.rows[*r], Row::Note(_)))
+                .unwrap();
+        };
+        s.focus = Pane::Diff;
+        on_note(&mut s);
+        press(&mut s, "a");
+        assert_eq!(s.review.items.len(), 1);
+        assert_eq!(source(&s), Source::General);
+        // The last one accepted, there is nothing general left to show.
+        on_note(&mut s);
+        press(&mut s, "a");
+        assert!(s.review.items.is_empty());
+        assert!(matches!(source(&s), Source::File(_)));
+    }
+
+    #[test]
     fn selecting_a_comment_opens_its_file_with_the_cursor_on_the_note() {
         let f = repo();
         let mut s = state(&f);

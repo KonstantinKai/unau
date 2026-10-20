@@ -13,6 +13,10 @@ impl AppState {
         Session {
             repo: self.repo.root.to_string_lossy().into_owned(),
             file: self.file.as_ref().and_then(|f| f.path()).map(str::to_owned),
+            general: self
+                .file
+                .as_ref()
+                .is_some_and(|f| f.source == Source::General),
             line: self.cursor_line(),
             focus: match self.focus {
                 Pane::Tree => Focus::Files,
@@ -45,7 +49,14 @@ impl AppState {
         self.flat = layout.flat;
         self.folded = session.folded.iter().cloned().collect();
         self.rebuild_tree();
-        if let Some(path) = session.file.as_ref().filter(|p| self.paths.contains(p)) {
+        let has_general = self
+            .review
+            .items
+            .iter()
+            .any(|i| i.scope == crate::review::Scope::General);
+        if session.general && has_general {
+            self.open_source(Source::General);
+        } else if let Some(path) = session.file.as_ref().filter(|p| self.paths.contains(p)) {
             self.open_source(Source::File(path.clone()));
         }
         self.rebuild_rows();
@@ -202,6 +213,28 @@ mod tests {
         s.restore(&saved, false);
         assert!(s.run_log.is_none());
         assert_eq!(s.focus, Pane::Tree);
+    }
+
+    #[test]
+    fn the_general_comments_come_back_open_while_the_review_has_any() {
+        let f = repo();
+        let mut s = state(&f);
+        press(&mut s, "noverall\n");
+        press(&mut s, "L");
+        assert_eq!(s.file.as_ref().unwrap().source, Source::General);
+        let saved = s.session();
+        let review = s.review.clone();
+
+        let mut s = state(&f);
+        s.review = review;
+        s.restore(&saved, true);
+        assert_eq!(s.file.as_ref().unwrap().source, Source::General);
+        assert_eq!(s.session(), saved);
+
+        // A review without general comments has nothing to show there.
+        let mut s = state(&f);
+        s.restore(&saved, true);
+        assert!(matches!(s.file.as_ref().unwrap().source, Source::File(_)));
     }
 
     #[test]

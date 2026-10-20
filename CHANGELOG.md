@@ -10,6 +10,14 @@
   saves the answer as `[run] reuse` in the repository's `.unau.toml`; with
   several sessions running it asks which one.
 
+### Fixed
+
+- Reading the General comments, any re-read of the repository (accepting one
+  of them, staging, or an outside edit) jumped to a file's diff. They now
+  stay open while any are left.
+- Quitting with the General comments open, the next start showed the first
+  file instead. They now come back open, as files already did.
+
 ## 0.3.1 - 2026-10-20
 
 ### Fixed

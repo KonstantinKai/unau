@@ -311,11 +311,20 @@ impl AppState {
         self.check_blobs();
         self.rebuild_tree();
         let source = self.file.as_ref().map(|f| f.source.clone());
-        if source.is_some_and(|s| {
-            self.tree
+        // General has no row in the files pane; it stays open while the
+        // review still has general comments to show.
+        let still_there = |s: &Source| match s {
+            Source::General => self
+                .review
+                .items
                 .iter()
-                .any(|t| self.tree_source(t) == Some(s.clone()))
-        }) {
+                .any(|i| i.scope == crate::review::Scope::General),
+            Source::File(_) => self
+                .tree
+                .iter()
+                .any(|t| self.tree_source(t).as_ref() == Some(s)),
+        };
+        if source.as_ref().is_some_and(still_there) {
             self.reload_file();
         } else {
             self.file = None;

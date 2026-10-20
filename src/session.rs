@@ -39,6 +39,9 @@ pub struct Session {
     pub repo: String,
     /// The file open in the diff.
     pub file: Option<String>,
+    /// The general comments were open instead of a file. Absent in files
+    /// written before it existed, which reads as `false`.
+    pub general: bool,
     /// New-side line under the diff cursor.
     pub line: Option<usize>,
     pub focus: Focus,
@@ -116,6 +119,7 @@ mod tests {
         let session = Session {
             repo: "/work/repo".into(),
             file: Some("src/a.rs".into()),
+            general: true,
             line: Some(12),
             focus: Focus::Comments,
             comments: true,
@@ -144,6 +148,11 @@ mod tests {
         };
         save(&path, &session).unwrap();
         assert_eq!(load(&path), Some(session));
+        // Written before the general view was saved: still read, as a file.
+        std::fs::write(&path, "repo = \"/work/repo\"\nfile = \"src/a.rs\"\n").unwrap();
+        let old = load(&path).unwrap();
+        assert!(!old.general);
+        assert_eq!(old.file.as_deref(), Some("src/a.rs"));
     }
 
     #[test]
