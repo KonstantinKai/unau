@@ -7,6 +7,7 @@ mod comments;
 mod files;
 mod filter;
 mod folding;
+mod goto;
 mod input;
 mod navigate;
 mod open;
@@ -238,6 +239,8 @@ pub struct AppState {
     pub theme_picker: Option<ThemePicker>,
     /// What narrows the files pane.
     pub filter: FileFilter,
+    /// The line number typed so far, while the go-to-line popup is open.
+    pub goto: Option<String>,
     /// Paths before the filter, for the `shown/all` count.
     pub all_paths: usize,
 }
@@ -287,6 +290,7 @@ impl AppState {
             comments: CommentsPane::default(),
             theme_picker: None,
             filter: FileFilter::default(),
+            goto: None,
             all_paths: 0,
         };
         state.check_blobs();
@@ -345,6 +349,7 @@ impl AppState {
             return false;
         }
         let busy = self.prompt.is_some()
+            || self.goto.is_some()
             || self.confirm.is_some()
             || self.file.as_ref().is_some_and(|f| f.anchor.is_some());
         if busy {

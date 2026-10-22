@@ -154,6 +154,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `j` `k` (or `Down` `Up`) | next / previous line |
 | `J` `K` | next / previous block of changed lines (added or removed), even when it is close enough to the last one to share its hunk |
 | `gg` `G` | first / last line |
+| `:` | go to a line: type its number in the popup, `Enter`. A line inside an "unchanged lines omitted" stretch lands on that separator; `z` opens it |
 | `Ctrl-e` `Ctrl-y` | scroll the diff one line; the cursor stays unless it would leave the screen |
 | `Ctrl-d` `Ctrl-u` | scroll the diff half a page down / up |
 | `Ctrl-f` `Ctrl-b` | scroll the diff a page down / up |

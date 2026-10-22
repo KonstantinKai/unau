@@ -38,6 +38,7 @@ actions! {
     PrevHunk = "prev_hunk" ["K"] "previous block of changes",
     Top = "top" ["gg"] "first line",
     Bottom = "bottom" ["G"] "last line",
+    GoToLine = "go_to_line" [":"] "go to a line of the file",
     ScrollDown = "scroll_down" ["C-e"] "scroll the diff down one line",
     ScrollUp = "scroll_up" ["C-y"] "scroll the diff up one line",
     HalfPageDown = "half_page_down" ["C-d"] "scroll the diff half a page down",

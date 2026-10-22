@@ -5,6 +5,7 @@ mod agent_choice;
 mod comments;
 mod confirm;
 mod diff;
+mod goto;
 mod picker;
 mod prompt;
 mod runpane;
@@ -54,6 +55,7 @@ pub fn render(state: &AppState, frame: &mut Frame) {
     runpane::render(state, frame, run_area, colors);
     diff::render(state, frame, diff_area, colors);
     prompt::render(state, frame, diff_area, main, colors);
+    goto::render(state, frame, main, colors);
     // A yes/no question or the help takes the whole screen's attention; the
     // comment popup and the theme picker leave it bright, since what is
     // behind them is the point.

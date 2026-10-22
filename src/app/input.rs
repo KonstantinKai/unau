@@ -20,6 +20,9 @@ impl AppState {
         if self.filter.typing {
             return self.filter_key(key);
         }
+        if self.goto.is_some() {
+            return self.goto_key(key);
+        }
         if let Some(confirm) = self.confirm.take() {
             if key == Key::char('y') {
                 return self.run_pending(confirm.pending);
@@ -69,6 +72,7 @@ impl AppState {
             Action::PrevHunk => self.jump_hunk(false),
             Action::Top => self.move_to(false),
             Action::Bottom => self.move_to(true),
+            Action::GoToLine => self.start_goto(),
             Action::ScrollDown => self.scroll(Scroll::Line, true),
             Action::ScrollUp => self.scroll(Scroll::Line, false),
             Action::HalfPageDown => self.scroll(Scroll::HalfPage, true),

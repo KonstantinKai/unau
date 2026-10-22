@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `:` goes to a line of the open file: type its number in a small popup and
+  press `Enter`.
+
 ## 0.4.0 - 2026-10-20
 
 ### Added
