@@ -159,6 +159,8 @@ one small file per repository and never inside it; delete one to start clean.
 | `Ctrl-d` `Ctrl-u` | scroll the diff half a page down / up |
 | `Ctrl-f` `Ctrl-b` | scroll the diff a page down / up |
 | `h` `l` (or `Left` `Right`) `Tab` | focus files / diff / cycle in pane-number order: files → diff → comments → run (shown panes only) |
+| `h` in the files pane | climb the tree: from a file to its folder, then fold that folder, then fold its parent, one level a press |
+| `l` in the files pane | open a folded folder; on an open one, go to its first entry; on a file, focus the diff |
 | `1` `2` `3` `4` | focus files / diff / comments / run pane (the last two shown if hidden); each pane's title starts with its number |
 | `Enter` | fold a directory, open a file; on a separator, expand |
 | `W` `E` | fold / unfold every directory (folding all leaves nested ones folded too) |

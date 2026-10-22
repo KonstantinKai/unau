@@ -6,6 +6,12 @@
 
 - `:` goes to a line of the open file: type its number in a small popup and
   press `Enter`.
+- `h` in the files pane climbs the tree, as in file managers: on a file it
+  moves to the file's folder, on an open folder it folds it, and on a folded
+  one it folds the folder above, so each press closes one more level.
+  Elsewhere `h` still focuses the files pane. `l` goes the other way: it
+  opens a folded folder, moves into an open one, and on a file focuses the
+  diff.
 
 ## 0.4.0 - 2026-10-20
 

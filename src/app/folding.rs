@@ -27,6 +27,68 @@ impl AppState {
         }
     }
 
+    /// `l` in the files pane descends: a folded directory opens, an open one
+    /// moves the cursor to its first child, and a file focuses the diff.
+    pub fn unfold_down(&mut self) {
+        let Some(row) = self.tree.get(self.tree_cursor) else {
+            return;
+        };
+        match &row.entry {
+            Entry::Dir { path, folded: true } => {
+                self.folded.remove(path);
+                self.rebuild_tree();
+            }
+            Entry::Dir { folded: false, .. } => {
+                let depth = row.depth;
+                let child = self.tree_cursor + 1;
+                if self.tree.get(child).is_some_and(|r| r.depth > depth) {
+                    self.tree_cursor = child;
+                    self.open_under_cursor();
+                }
+            }
+            Entry::File(_) => self.focus_diff(),
+        }
+        self.scroll_to_cursor();
+    }
+
+    /// `h` in the files pane climbs the tree: from a file to its directory,
+    /// an open directory folds, and a folded one folds its parent, so each
+    /// press closes one more level.
+    pub fn fold_up(&mut self) {
+        let Some(row) = self.tree.get(self.tree_cursor) else {
+            return;
+        };
+        let parent = self.tree[..self.tree_cursor]
+            .iter()
+            .rposition(|above| above.depth < row.depth);
+        match &row.entry {
+            Entry::Dir {
+                path,
+                folded: false,
+            } => {
+                self.folded.insert(path.clone());
+                self.rebuild_tree();
+            }
+            Entry::Dir { folded: true, .. } => {
+                let Some(parent) = parent else {
+                    return;
+                };
+                self.tree_cursor = parent;
+                if let Entry::Dir { path, .. } = &self.tree[parent].entry {
+                    self.folded.insert(path.clone());
+                }
+                self.rebuild_tree();
+            }
+            Entry::File(_) => {
+                let Some(parent) = parent else {
+                    return;
+                };
+                self.tree_cursor = parent;
+            }
+        }
+        self.scroll_to_cursor();
+    }
+
     /// Folds every directory, nested ones included, so opening a top
     /// directory shows its children still folded.
     pub fn fold_all(&mut self) {
@@ -124,5 +186,57 @@ mod tests {
         s.tree_cursor = s.tree.iter().position(|r| r.label == "b.rs").unwrap();
         press(&mut s, "W");
         assert_eq!(s.tree[s.tree_cursor].label, "src/");
+    }
+
+    #[test]
+    fn h_in_the_files_pane_climbs_and_folds_one_level_a_press() {
+        let f = nested();
+        let mut s = state(&f);
+        s.focus = crate::app::Pane::Diff;
+        s.tree_cursor = s.tree.iter().position(|r| r.label == "b.rs").unwrap();
+        press(&mut s, "h");
+        assert_eq!(
+            s.focus,
+            crate::app::Pane::Tree,
+            "from the diff, h only focuses"
+        );
+        assert_eq!(s.tree[s.tree_cursor].label, "b.rs");
+        press(&mut s, "h");
+        assert_eq!(s.tree[s.tree_cursor].label, "ui/");
+        assert_eq!(s.tree.len(), 6, "moving up folds nothing");
+        press(&mut s, "h");
+        assert_eq!(labels(&s), ["src/", "app/", "a.rs", "ui/", "top.rs"]);
+        assert_eq!(s.tree[s.tree_cursor].label, "ui/");
+        press(&mut s, "h");
+        assert_eq!(labels(&s), ["src/", "top.rs"]);
+        assert_eq!(s.tree[s.tree_cursor].label, "src/");
+        press(&mut s, "h");
+        assert_eq!(labels(&s), ["src/", "top.rs"], "nothing above the top");
+    }
+
+    #[test]
+    fn l_in_the_files_pane_opens_goes_in_and_focuses_the_diff_on_a_file() {
+        let f = nested();
+        let mut s = state(&f);
+        s.focus = crate::app::Pane::Tree;
+        s.tree_cursor = 0;
+        press(&mut s, "\n");
+        assert_eq!(labels(&s), ["src/", "top.rs"]);
+        press(&mut s, "l");
+        assert_eq!(
+            labels(&s),
+            ["src/", "app/", "a.rs", "ui/", "b.rs", "top.rs"]
+        );
+        assert_eq!(
+            s.tree[s.tree_cursor].label, "src/",
+            "opening keeps the cursor"
+        );
+        press(&mut s, "l");
+        assert_eq!(s.tree[s.tree_cursor].label, "app/");
+        press(&mut s, "l");
+        assert_eq!(s.tree[s.tree_cursor].label, "a.rs");
+        assert_eq!(s.focus, crate::app::Pane::Tree);
+        press(&mut s, "l");
+        assert_eq!(s.focus, crate::app::Pane::Diff);
     }
 }
