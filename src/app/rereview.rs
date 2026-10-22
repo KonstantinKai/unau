@@ -17,8 +17,9 @@ pub struct Region {
 
 /// Where an item's lines are in `new_text` now. Tries the anchor, then the
 /// quoted lines anywhere (nearest wins), then the first or last quoted line
-/// alone, then the anchor itself if a change in `changed` (new-side lines
-/// the changes touch, staged ones included) lands on it. `None` means the anchor is lost.
+/// alone, then the changed lines that read most like the quote, then the
+/// anchor itself if a change in `changed` (new-side lines the changes touch,
+/// staged ones included) lands on it. `None` means the anchor is lost.
 pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Option<Region> {
     let Scope::Lines {
         start,
@@ -76,6 +77,10 @@ pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Optio
         }
     }
     if let Some((_, region)) = candidates.into_iter().min_by_key(|(d, _)| *d) {
+        return Some(region);
+    }
+    // Edited, and maybe moved too: the changed stretch most like the quote.
+    if let Some(region) = super::similar::closest(item, new_text, changed) {
         return Some(region);
     }
     // The quoted lines were all rewritten in place: the change sits on the anchor.
@@ -359,6 +364,12 @@ mod tests {
     /// the item; the tool reopens it with `--review`.
     fn reviewed(f: &Fixture) -> super::super::AppState {
         let body = crate::git::fixture::numbered(20);
+        reviewed_as(f, &body.replace("line 5\n", "line 5 good\nline 5b\n"))
+    }
+
+    /// As `reviewed`, with the agent leaving the file as `fixed`.
+    fn reviewed_as(f: &Fixture, fixed: &str) -> super::super::AppState {
+        let body = crate::git::fixture::numbered(20);
         f.write("a.txt", &body);
         f.commit_all("init");
         f.write("a.txt", &body.replace("line 5\n", "line 5 bad\n"));
@@ -374,7 +385,7 @@ mod tests {
         file.cursor = file.view.row_of(0, line).unwrap();
         press(&mut s, "cname it better\n");
         let path = s.review_path().unwrap().clone();
-        f.write("a.txt", &body.replace("line 5\n", "line 5 good\nline 5b\n"));
+        f.write("a.txt", fixed);
         let mut review = s.review.clone();
         review.items[0].done = true;
         std::fs::write(&path, write(&review)).unwrap();
@@ -434,6 +445,38 @@ mod tests {
         assert!(s.review.items.is_empty(), "{:?}", s.message);
         assert!(f.git(&["diff", "--cached"]).contains("+line 5 good"));
         assert!(s.complete());
+    }
+
+    #[test]
+    fn a_fix_that_edited_and_moved_the_quoted_line_is_found_and_accepted() {
+        let f = Fixture::new();
+        let fixed = crate::git::fixture::numbered(20)
+            .replace("line 2\n", "line 2\nnew a\nnew b\n")
+            .replace("line 5\n", "line 5 better\n");
+        let mut s = reviewed_as(&f, &fixed);
+        let file = s.file.as_ref().unwrap();
+        let shown = &file.notes[&0];
+        assert!(
+            !shown.iter().any(|l| l.text.contains("anchor lost")),
+            "{shown:?}"
+        );
+        let note = file
+            .view
+            .rows
+            .iter()
+            .position(|r| matches!(r, Row::Note(_)))
+            .unwrap();
+        // The note sits under the line's new place, two lines down.
+        assert!(matches!(
+            file.view.rows[note - 1],
+            Row::Code { section, lines } if lines.iter().flatten().any(|i| {
+                file.sections[section].diff.lines[*i].text == "line 5 better"
+            })
+        ));
+        s.file.as_mut().unwrap().cursor = note;
+        press(&mut s, "a");
+        assert!(s.review.items.is_empty(), "{:?}", s.message);
+        assert!(f.git(&["diff", "--cached"]).contains("+line 5 better"));
     }
 
     #[test]

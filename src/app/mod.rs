@@ -17,6 +17,7 @@ mod rereview;
 mod resume;
 mod runlog;
 mod settings;
+mod similar;
 mod stage;
 
 pub use agent_choice::AgentChoice;

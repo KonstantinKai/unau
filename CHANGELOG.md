@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- When the agent edited the lines a comment quoted, for a typo or a better
+  wording, and also added or removed lines above them, re-review lost the
+  comment's place: it showed "anchor lost", and `a` refused to accept it with
+  an error. unau now finds the edited lines by how much they still read like
+  the quote, shows the comment under their new place, and `a` stages them.
+
 ## 0.5.0 - 2026-10-22
 
 ### Added
