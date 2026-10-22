@@ -24,7 +24,11 @@ impl AppState {
             return self.goto_key(key);
         }
         if let Some(confirm) = self.confirm.take() {
-            if key == Key::char('y') {
+            // A quit key at the quit question answers it, so `Ctrl-c` twice
+            // leaves as it does elsewhere.
+            let quit_again = confirm.pending == Pending::Quit
+                && lookup(&self.config.keys, &[key]) == Lookup::Action(Action::Quit);
+            if key == Key::char('y') || quit_again {
                 return self.run_pending(confirm.pending);
             }
             self.info("cancelled");
@@ -475,6 +479,19 @@ mod tests {
         assert!(question.contains("1 open item(s), never run"), "{question}");
         assert!(question.contains("will be stopped"), "{question}");
         assert_eq!(press(&mut s, "y"), Effect::Quit);
+    }
+
+    #[test]
+    fn ctrl_c_asks_to_quit_and_a_second_one_quits() {
+        let f = repo();
+        let mut s = state(&f);
+        let ctrl_c = Key {
+            code: KeyCodeKey::Char('c'),
+            ctrl: true,
+        };
+        assert_eq!(s.handle_key(ctrl_c), Effect::None);
+        assert_eq!(s.confirm.as_ref().unwrap().question, "Quit unau?");
+        assert_eq!(s.handle_key(ctrl_c), Effect::Quit);
     }
 
     #[test]

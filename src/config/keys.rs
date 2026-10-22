@@ -84,7 +84,7 @@ actions! {
     EditInstructions = "edit_instructions" ["i"] "edit the agent instructions in $EDITOR",
     OpenFile = "open_file" ["o"] "open the file in $EDITOR at the cursor line",
     Accept = "accept" ["a"] "accept fix (re-review)",
-    Quit = "quit" ["Q"] "quit",
+    Quit = "quit" ["Q", "C-c"] "quit; pressed again at the question, quits",
     Help = "help" ["?"] "help",
 }
 

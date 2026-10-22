@@ -187,7 +187,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
 | `a` | accept a done item: stage its hunk, drop it from the review |
-| `Q` | quit; asks first in a popup, naming open items never run or a running command (`[ui] confirm_quit = false` to skip) |
+| `Q` `Ctrl-c` | quit; asks first in a popup, naming open items never run or a running command (`[ui] confirm_quit = false` to skip). `y`, or the quit key again (`Ctrl-c` twice), answers yes |
 | `?` | help |
 
 The scroll keys (`Ctrl-e`/`Ctrl-y`, `Ctrl-d`/`Ctrl-u`, `Ctrl-f`/`Ctrl-b`) move

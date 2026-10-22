@@ -12,6 +12,8 @@
   Elsewhere `h` still focuses the files pane. `l` goes the other way: it
   opens a folded folder, moves into an open one, and on a file focuses the
   diff.
+- `Ctrl-c` quits, like `Q`: it asks first, and a second `Ctrl-c` answers
+  yes.
 
 ## 0.4.0 - 2026-10-20
 
