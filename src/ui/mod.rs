@@ -358,9 +358,21 @@ fn disabled_in_range(action: Action) -> bool {
     matches!(action, Action::Stage | Action::Unstage | Action::Discard)
 }
 
+/// Width of the help's key column, keys right-aligned in it.
+const HELP_KEYS: usize = 12;
+
 fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
     let area = frame.area();
-    let width = area.width.min(72 + 2 * POPUP_PADDING);
+    let help = help_lines(state);
+    // As wide as the longest line, so no description is cut off when the
+    // screen has room: key column, gap, text, padding and borders.
+    let widest = help
+        .iter()
+        .map(|(_, text, _)| HELP_KEYS + 2 + text.chars().count())
+        .max()
+        .unwrap_or(0);
+    let wanted = u16::try_from(widest).unwrap_or(u16::MAX) + 2 * POPUP_PADDING + 2;
+    let width = area.width.min(wanted);
     let height = area
         .height
         .min(u16::try_from(Action::ALL.len() + 4).unwrap_or(u16::MAX));
@@ -372,7 +384,7 @@ fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
         width,
         height,
     };
-    let lines: Vec<Line> = help_lines(state)
+    let lines: Vec<Line> = help
         .into_iter()
         .map(|(keys, help, disabled)| {
             let style = if disabled {
@@ -384,7 +396,7 @@ fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
             };
             Line::from(vec![
                 Span::styled(
-                    format!("{keys:>12}  "),
+                    format!("{keys:>HELP_KEYS$}  "),
                     Style::new().fg(colors.border_active),
                 ),
                 Span::styled(help, style),
