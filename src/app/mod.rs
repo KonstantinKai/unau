@@ -10,6 +10,7 @@ mod folding;
 mod goto;
 mod input;
 mod navigate;
+mod notes;
 mod open;
 mod persist;
 mod picker;

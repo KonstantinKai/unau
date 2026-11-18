@@ -298,6 +298,7 @@ fn draw_note(
             NoteStyle::Added => spans.push(Span::styled(text, style.fg(colors.added))),
             NoteStyle::Removed => spans.push(Span::styled(text, style.fg(colors.removed))),
             NoteStyle::Warning => spans.push(Span::styled(text, style.fg(colors.error))),
+            NoteStyle::Reply => spans.push(Span::styled(text, style.fg(colors.text))),
             NoteStyle::Same | NoteStyle::Text | NoteStyle::Header { .. } => {
                 spans.push(Span::styled(text, style.fg(colors.muted)));
             }

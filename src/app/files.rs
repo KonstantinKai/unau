@@ -1,7 +1,7 @@
 //! The open file: its rows, notes, wrapping and highlighting, all computed in
 //! the update step so rendering only reads.
 
-use super::{AppState, Pane, rereview};
+use super::{AppState, Pane, notes, rereview};
 use crate::{
     config::LineNumbers,
     diff::{self, Highlighting, Row, SectionView, View, wrap_ranges},
@@ -29,6 +29,8 @@ pub enum NoteStyle {
         working: bool,
     },
     Text,
+    /// What the agent wrote under the item, such as the answer to a question.
+    Reply,
     Same,
     Removed,
     Added,
@@ -438,7 +440,7 @@ fn rows_for(
             section: target.unwrap_or(0),
             line,
         });
-        notes.insert(index, note_lines(item, region, &file.new_text));
+        notes.insert(index, notes::note_lines(item, region, &file.new_text));
     }
     // Name the sections whenever staged lines are shown, so accepted lines are never mistaken for open ones.
     let titles = file
@@ -463,48 +465,6 @@ fn note_line(lines: &[crate::git::Line], start: usize, end: usize, removed: bool
     } else {
         lines.iter().position(|l| l.new == Some(end))
     }
-}
-
-fn note_lines(item: &Item, region: Option<rereview::Region>, new_text: &[String]) -> Vec<NoteLine> {
-    let mut text = item.text.lines();
-    let first = match item.kind {
-        Kind::Suggestion => "replace with".to_owned(),
-        _ => text.next().unwrap_or_default().to_owned(),
-    };
-    let mut lines = vec![NoteLine {
-        text: first,
-        style: NoteStyle::Header {
-            kind: item.kind,
-            done: item.done,
-            working: item.working,
-        },
-    }];
-    lines.extend(text.map(|t| NoteLine {
-        text: t.to_owned(),
-        style: NoteStyle::Text,
-    }));
-    if let Some(replacement) = &item.replacement {
-        lines.extend(replacement.iter().map(|t| NoteLine {
-            text: t.clone(),
-            style: NoteStyle::Added,
-        }));
-    }
-    let lines_scope = matches!(item.scope, Scope::Lines { removed: false, .. });
-    if lines_scope && region.is_none() {
-        lines.push(NoteLine {
-            text: "anchor lost: the quoted lines are gone".to_owned(),
-            style: NoteStyle::Warning,
-        });
-    }
-    // A ticked item shows what its lines were against what they are now.
-    if item.done
-        && lines_scope
-        && let Some(region) = region
-    {
-        let now = &new_text[region.start - 1..region.end.min(new_text.len())];
-        lines.extend(rereview::quote_diff(item, now));
-    }
-    lines
 }
 
 #[cfg(test)]

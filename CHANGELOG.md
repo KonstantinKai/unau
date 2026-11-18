@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- What the agent wrote under an item, such as the answer to a question, was
+  kept in the review file but never shown, so an answered question looked
+  like a bare tick. It now shows in the item's note, under the comment,
+  marked `↳`.
+
 ## 0.5.1 - 2026-10-22
 
 ### Fixed
