@@ -19,3 +19,7 @@ include = ["THIRD_PARTY_NOTICES.md"]
 install-path = "CARGO_HOME"
 # Upgrades go through brew, cargo or rerunning the installer.
 install-updater = false
+
+# dist 0.32 picks `macos-14` for Apple silicon, an image GitHub has retired.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
