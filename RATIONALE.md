@@ -41,10 +41,13 @@ The review file's shape (a dated Markdown checklist with a frontmatter
 2. **The working tree by default; commits and ranges from day one.** Staged,
    unstaged and untracked changes are what an agent leaves behind. A commit
    or range uses the same engine read-only, so staging keys are off there.
-3. **Staged means accepted.** Anything staged is done, so it never appears in
-   the review. The review file is the to-do list, not a transcript; accepting
-   a fix in re-review stages it, and a review is finished when nothing is open
-   and nothing is left unstaged.
+3. **Staged means accepted.** Anything staged is done, so its lines never
+   appear in the review. Accepting a fix in re-review stages it, and a review
+   is finished when nothing is open and nothing is left unstaged. An accepted
+   item stays in the file, marked `accepted`: removing it made answers and
+   decisions vanish the moment they were taken, and the reviewer lost the
+   record of what was asked and why. It costs the agent nothing, since it is
+   ticked and settled.
 4. **The review file is the state.** Markdown, written on every change, no
    save key, no JSON sidecar or database. Reopening the file gives the review
    back, a person can read and edit it, and any agent that reads text can act

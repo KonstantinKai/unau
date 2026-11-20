@@ -21,6 +21,7 @@ pub(super) fn note_lines(
             kind: item.kind,
             done: item.done,
             working: item.working,
+            accepted: item.accepted,
         },
     }];
     lines.extend(text.map(|t| NoteLine {
@@ -44,8 +45,10 @@ pub(super) fn note_lines(
             style: NoteStyle::Warning,
         });
     }
-    // A ticked item shows what its lines were against what they are now.
+    // A ticked item shows what its lines were against what they are now;
+    // an accepted one is settled, so its note stays short.
     if item.done
+        && !item.accepted
         && lines_scope
         && let Some(region) = region
     {

@@ -29,14 +29,21 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
     }
     let focused = state.focus == Pane::Comments;
     let open = state.review.open_items();
-    let done = state.review.items.len() - open;
+    let done = state.review.done_items();
+    let accepted = match state.review.accepted_items() {
+        0 => String::new(),
+        n => format!(" · {n} accepted"),
+    };
     let block = Block::new()
         .borders(Borders::ALL)
         .border_style(border(focused, colors))
         .title(super::pane_title(
             state,
             Action::FocusComments,
-            &format!("comments · {open} open{} · {done} done", working(state)),
+            &format!(
+                "comments · {open} open{} · {done} done{accepted}",
+                working(state)
+            ),
             colors,
         ));
     let inner = block.inner(area);
@@ -63,13 +70,22 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
                 } else if item.working {
                     spans.push(Span::styled("~ ", Style::new().fg(colors.info)));
                 }
-                spans.push(Span::styled(
-                    format!("[{}] ", item.kind.name()),
-                    Style::new().fg(kind_color).add_modifier(Modifier::BOLD),
-                ));
+                // An accepted item is a record: dimmed, nothing left to do.
+                let (kind_style, text_color) = if item.accepted {
+                    (Style::new().fg(colors.muted), colors.muted)
+                } else {
+                    (
+                        Style::new().fg(kind_color).add_modifier(Modifier::BOLD),
+                        colors.text,
+                    )
+                };
+                if item.accepted {
+                    spans.push(Span::styled("accepted ", Style::new().fg(colors.muted)));
+                }
+                spans.push(Span::styled(format!("[{}] ", item.kind.name()), kind_style));
                 spans.push(Span::styled(
                     comment_label(item),
-                    Style::new().fg(colors.text),
+                    Style::new().fg(text_color),
                 ));
                 let line = Line::from(spans);
                 if row == pane.cursor {

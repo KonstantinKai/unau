@@ -2,8 +2,20 @@
 
 ## Unreleased
 
+### Changed
+
+- Accepting a fix keeps its item in the review file, marked `accepted`
+  (`- [x] accepted fix …`), instead of removing it, so the answers and
+  decisions of a review stay readable after you take them. Accepted items
+  are dimmed in the comments pane and the diff, counted apart in the
+  comments pane's title, and the agent instructions tell agents to leave
+  them alone. Staging the lines of an item the agent ticked accepts it the
+  same way.
+
 ### Fixed
 
+- A file whose changes were all staged showed its comments at the top of the
+  diff instead of under their lines.
 - The files pane and the diff could stay scrolled down after they had room
   for more, for example after zooming the diff and back, folding folders, or
   staging most of a diff: the top stayed hidden above an empty stretch, at

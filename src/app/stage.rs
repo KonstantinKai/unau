@@ -252,9 +252,26 @@ impl AppState {
             self.error(format!("{err:#}"));
             return;
         }
-        let drop: Vec<&Item> = done.iter().flat_map(|r| &r.drop).collect();
-        if !drop.is_empty() {
-            self.review.items.retain(|i| !drop.contains(&i));
+        // Staging a done item's lines takes its fix: it stays, accepted. Any
+        // other item on changed lines goes, its lines being settled.
+        let mut taken: Vec<Item> = Vec::new();
+        let mut gone: Vec<Item> = Vec::new();
+        for request in &done {
+            for item in &request.drop {
+                if request.change == Change::Stage && item.done {
+                    taken.push(item.clone());
+                } else {
+                    gone.push(item.clone());
+                }
+            }
+        }
+        if !taken.is_empty() || !gone.is_empty() {
+            for item in &mut self.review.items {
+                if taken.contains(item) {
+                    item.accepted = true;
+                }
+            }
+            self.review.items.retain(|i| !gone.contains(i));
             self.persist();
         }
         if failed.is_none()
@@ -360,6 +377,8 @@ fn touched_items(
         .collect();
     items
         .iter()
+        // An accepted item is settled; nothing staged later changes it.
+        .filter(|item| !item.accepted)
         .filter(|item| match &item.scope {
             Scope::Lines {
                 path: p,

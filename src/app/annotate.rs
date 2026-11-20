@@ -75,6 +75,10 @@ impl AppState {
             .and_then(super::FileState::note_under_cursor)
             && self.review.items[item].done
         {
+            if self.review.items[item].accepted {
+                self.error("already accepted: its lines are staged");
+                return;
+            }
             let kind = match self.review.items[item].kind {
                 Kind::Question => Kind::Question,
                 Kind::Fix | Kind::Suggestion => Kind::Fix,

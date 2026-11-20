@@ -316,21 +316,22 @@ mod tests {
         }
         s.reload_file();
         let on_note = |s: &mut crate::app::AppState| {
+            let accepted: Vec<bool> = s.review.items.iter().map(|i| i.accepted).collect();
             let file = s.file.as_mut().unwrap();
             file.cursor = (0..file.view.rows.len())
-                .find(|r| matches!(file.view.rows[*r], Row::Note(_)))
+                .find(|r| matches!(file.view.rows[*r], Row::Note(n) if !accepted[n]))
                 .unwrap();
         };
         s.focus = Pane::Diff;
         on_note(&mut s);
         press(&mut s, "a");
-        assert_eq!(s.review.items.len(), 1);
+        assert_eq!(s.review.accepted_items(), 1);
         assert_eq!(source(&s), Source::General);
-        // The last one accepted, there is nothing general left to show.
+        // Accepted ones stay as a record, so the view stays too.
         on_note(&mut s);
         press(&mut s, "a");
-        assert!(s.review.items.is_empty());
-        assert!(matches!(source(&s), Source::File(_)));
+        assert_eq!(s.review.accepted_items(), 2);
+        assert_eq!(source(&s), Source::General);
     }
 
     #[test]

@@ -36,6 +36,13 @@ pub fn merge(base: &Review, ours: &Review, theirs: &Review) -> Review {
             merged.items.push(item.clone());
         }
     }
+    // Accepting is the reviewer's, so the agent's copy never undoes it.
+    for item in ours.items.iter().filter(|i| i.accepted) {
+        if let Some(at) = position(&merged.items, item) {
+            merged.items[at].done = true;
+            merged.items[at].accepted = true;
+        }
+    }
     for (path, sha) in &ours.files {
         merged
             .files
@@ -94,6 +101,17 @@ mod tests {
         let merged = merge(&base, &ours, &theirs);
         assert_eq!(merged.items.len(), 1);
         assert!(merged.items[0].done);
+    }
+
+    #[test]
+    fn an_accepted_item_stays_accepted_whatever_the_agent_wrote() {
+        let mut base = review(&[item("a")]);
+        base.items[0].done = true;
+        let theirs = base.clone();
+        let mut ours = base.clone();
+        ours.items[0].accepted = true;
+        let merged = merge(&base, &ours, &theirs);
+        assert!(merged.items[0].done && merged.items[0].accepted);
     }
 
     #[test]

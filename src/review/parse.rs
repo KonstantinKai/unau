@@ -2,7 +2,7 @@
 //! `*` bullets, reordered sections, and prose the tool does not understand,
 //! which is kept verbatim.
 
-use super::write::{IN_PLACE_OF, REMOVED_LANG, REPLACE_WITH};
+use super::write::{ACCEPTED, IN_PLACE_OF, REMOVED_LANG, REPLACE_WITH};
 use super::{Elision, INSTRUCTIONS_HEADING, Item, Kind, Review, Scope, Status};
 use anyhow::{Result, bail};
 
@@ -150,6 +150,13 @@ fn split_text(rest: &str) -> Option<(&str, &str)> {
 }
 
 fn item(path: Option<&str>, done: bool, rest: &str, body: &[&str]) -> Option<Item> {
+    let (accepted, rest) = match rest
+        .strip_prefix(ACCEPTED)
+        .and_then(|r| r.strip_prefix(' '))
+    {
+        Some(rest) => (true, rest),
+        None => (false, rest),
+    };
     let (kind, scope, text) = match path {
         None => {
             let (kind, text) = rest.split_once(": ")?;
@@ -182,6 +189,8 @@ fn item(path: Option<&str>, done: bool, rest: &str, body: &[&str]) -> Option<Ite
     };
     let mut item = Item::new(kind, scope, text.to_owned());
     item.done = done;
+    // An item unticked by hand is open again, whatever it says.
+    item.accepted = accepted && done;
     let mut text_lines = Vec::new();
     let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
     let mut i = 0;
@@ -384,6 +393,32 @@ mod tests {
         assert!(rewritten.contains("- [~] fix: split"), "{rewritten}");
         assert!(rewritten.contains("status: in-progress"), "{rewritten}");
         assert_eq!(parse(&rewritten).unwrap(), review);
+    }
+
+    #[test]
+    fn accepted_items_round_trip_and_an_unticked_one_is_open_again() {
+        let mut review = sample();
+        for item in &mut review.items {
+            item.done = true;
+            item.accepted = true;
+        }
+        let text = write(&review);
+        assert!(text.contains("- [x] accepted fix: split"), "{text}");
+        assert!(
+            text.contains("- [x] accepted question `:42-48` — why"),
+            "{text}"
+        );
+        assert_eq!(parse(&text).unwrap(), review);
+        assert_eq!(review.accepted_items(), review.items.len());
+        assert_eq!(review.done_items(), 0);
+        let unticked =
+            parse(&text.replace("- [x] accepted fix: split", "- [ ] accepted fix: split")).unwrap();
+        let item = unticked
+            .items
+            .iter()
+            .find(|i| i.text == "split the test")
+            .unwrap();
+        assert!(!item.done && !item.accepted);
     }
 
     #[test]

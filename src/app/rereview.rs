@@ -1,9 +1,9 @@
 //! Re-review: finding anchors again after the agent changed the file,
 //! showing what changed, and accepting a fix by staging it.
 
-use super::{AppState, NoteLine, NoteStyle};
+use super::{NoteLine, NoteStyle};
 use crate::{
-    git::{Change, FileDiff, LineKind, SectionKind, apply},
+    git::{FileDiff, LineKind},
     review::{Item, Scope},
 };
 use std::collections::HashMap;
@@ -13,6 +13,20 @@ use std::collections::HashMap;
 pub struct Region {
     pub start: usize,
     pub end: usize,
+}
+
+/// Whether `item`'s quote sits in `text` from zero-based line `p`. A capped
+/// quote is its head at `p` and its tail at the end of the lines it stood for.
+pub fn quote_at(item: &Item, text: &[String], p: usize) -> bool {
+    let q = item.quote_len();
+    let (head, tail) = item.elided.map_or((item.quote.as_slice(), &[][..]), |e| {
+        item.quote.split_at(e.at.min(item.quote.len()))
+    });
+    text.get(p..p + head.len()).is_some_and(|w| w == head)
+        && (p + q)
+            .checked_sub(tail.len())
+            .and_then(|t| text.get(t..p + q))
+            .is_some_and(|w| w == tail)
 }
 
 /// Where an item's lines are in `new_text` now. Tries the anchor, then the
@@ -34,18 +48,8 @@ pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Optio
     if *removed || item.quote.is_empty() {
         return (start >= 1 && start <= new_text.len() + 1).then_some(Region { start, end });
     }
-    // A capped quote is its head at the region's start and its tail at its end.
     let q = item.quote_len();
-    let (head, tail) = item.elided.map_or((item.quote.as_slice(), &[][..]), |e| {
-        item.quote.split_at(e.at.min(item.quote.len()))
-    });
-    let at = |p: usize| {
-        new_text.get(p..p + head.len()).is_some_and(|w| w == head)
-            && (p + q)
-                .checked_sub(tail.len())
-                .and_then(|t| new_text.get(t..p + q))
-                .is_some_and(|w| w == tail)
-    };
+    let at = |p: usize| quote_at(item, new_text, p);
     let nearest =
         |candidates: Vec<usize>| candidates.into_iter().min_by_key(|p| p.abs_diff(start - 1));
     if at(start - 1) {
@@ -197,93 +201,10 @@ pub(super) fn touched_new(diff: &FileDiff) -> Vec<usize> {
     touched
 }
 
-impl AppState {
-    /// Accepts the done item under the cursor: stages the hunks that touch its
-    /// lines and removes it from the review.
-    pub fn accept(&mut self) {
-        let Some(file) = &self.file else {
-            return;
-        };
-        let Some(n) = file.note_under_cursor() else {
-            self.error("put the cursor on a done annotation");
-            return;
-        };
-        let item = self.review.items[n].clone();
-        if !item.done {
-            self.error("not done yet: the agent has not ticked this item");
-            return;
-        }
-        let region = match &item.scope {
-            Scope::Lines { .. } => {
-                let Some(region) = find_region(&item, &file.new_text, &file.changed_lines()) else {
-                    self.error("anchor lost: stage the fix with s, then delete the item with x");
-                    return;
-                };
-                Some(region)
-            }
-            Scope::File(_) => Some(Region {
-                start: 1,
-                end: usize::MAX,
-            }),
-            Scope::General => None,
-        };
-        let section = file
-            .sections
-            .iter()
-            .position(|s| s.kind == SectionKind::Unstaged);
-        let mut staged = 0;
-        if let (Some(region), Some(s), false) = (region, section, self.target.is_range()) {
-            let diff = &file.sections[s].diff;
-            let mut selected = vec![false; diff.lines.len()];
-            let new_lines = touched_new(diff);
-            for hunk in &file.views[s].hunks {
-                let touches = hunk.clone().any(|i| {
-                    diff.lines[i].is_change() && (region.start..=region.end).contains(&new_lines[i])
-                });
-                if touches {
-                    for i in hunk.clone() {
-                        selected[i] = diff.lines[i].is_change();
-                    }
-                }
-            }
-            if diff.binary && region.end == usize::MAX {
-                selected = vec![true; diff.lines.len().max(1)];
-            }
-            staged = selected.iter().filter(|s| **s).count();
-            if staged > 0
-                && let Err(err) = apply(&self.repo, diff, file.untracked, Change::Stage, &selected)
-            {
-                self.error(format!("{err:#}"));
-                return;
-            }
-        }
-        self.review.items.retain(|i| *i != item);
-        if let Err(err) = self.refresh() {
-            self.error(format!("{err:#}"));
-        }
-        self.persist();
-        if self.message.is_none() {
-            if staged > 0 {
-                self.info(format!("accepted: staged {staged} line(s)"));
-            } else {
-                self.info("accepted: its fix was already staged");
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::{
-        Pane, Store,
-        tests::{press, state},
-    };
     use super::*;
-    use crate::{
-        diff::Row,
-        git::fixture::Fixture,
-        review::{Kind, write},
-    };
+    use crate::{git::fixture::Fixture, review::Kind};
 
     fn texts(lines: &[&str]) -> Vec<String> {
         lines.iter().map(|l| (*l).to_owned()).collect()
@@ -360,151 +281,6 @@ mod tests {
         );
     }
 
-    /// A review written at one point, then the agent edits the file and ticks
-    /// the item; the tool reopens it with `--review`.
-    fn reviewed(f: &Fixture) -> super::super::AppState {
-        let body = crate::git::fixture::numbered(20);
-        reviewed_as(f, &body.replace("line 5\n", "line 5 good\nline 5b\n"))
-    }
-
-    /// As `reviewed`, with the agent leaving the file as `fixed`.
-    fn reviewed_as(f: &Fixture, fixed: &str) -> super::super::AppState {
-        let body = crate::git::fixture::numbered(20);
-        f.write("a.txt", &body);
-        f.commit_all("init");
-        f.write("a.txt", &body.replace("line 5\n", "line 5 bad\n"));
-        let mut s = state(f);
-        s.focus = Pane::Diff;
-        let file = s.file.as_mut().unwrap();
-        let line = file.sections[0]
-            .diff
-            .lines
-            .iter()
-            .position(|l| l.text == "line 5 bad")
-            .unwrap();
-        file.cursor = file.view.row_of(0, line).unwrap();
-        press(&mut s, "cname it better\n");
-        let path = s.review_path().unwrap().clone();
-        f.write("a.txt", fixed);
-        let mut review = s.review.clone();
-        review.items[0].done = true;
-        std::fs::write(&path, write(&review)).unwrap();
-        let (review, store) = super::super::persist::open(path).unwrap();
-        let mut s = super::super::AppState::new(
-            f.repo.clone(),
-            crate::git::Target::WorkTree,
-            crate::git::snapshot(&f.repo, &crate::git::Target::WorkTree).unwrap(),
-            crate::config::Config::default(),
-            review,
-            store,
-        );
-        assert!(matches!(s.store, Store::File { path: Some(_), .. }));
-        s.resize(120, 40);
-        s.focus = Pane::Diff;
-        s
-    }
-
-    #[test]
-    fn reopened_review_shows_done_items_with_what_changed() {
-        let f = Fixture::new();
-        let s = reviewed(&f);
-        assert!(s.changed_since_review.contains("a.txt"));
-        let file = s.file.as_ref().unwrap();
-        let notes = &file.notes[&0];
-        assert!(matches!(
-            notes[0].style,
-            NoteStyle::Header { done: true, .. }
-        ));
-        assert!(
-            notes
-                .iter()
-                .any(|l| l.style == NoteStyle::Added && l.text.contains("line 5 good"))
-        );
-        assert!(
-            notes
-                .iter()
-                .any(|l| l.style == NoteStyle::Removed && l.text.contains("line 5 bad"))
-        );
-    }
-
-    #[test]
-    fn accepting_a_done_item_stages_its_hunk_and_removes_it() {
-        let f = Fixture::new();
-        let mut s = reviewed(&f);
-        let note = s
-            .file
-            .as_ref()
-            .unwrap()
-            .view
-            .rows
-            .iter()
-            .position(|r| matches!(r, Row::Note(_)))
-            .unwrap();
-        s.file.as_mut().unwrap().cursor = note;
-        press(&mut s, "a");
-        assert!(s.review.items.is_empty(), "{:?}", s.message);
-        assert!(f.git(&["diff", "--cached"]).contains("+line 5 good"));
-        assert!(s.complete());
-    }
-
-    #[test]
-    fn a_fix_that_edited_and_moved_the_quoted_line_is_found_and_accepted() {
-        let f = Fixture::new();
-        let fixed = crate::git::fixture::numbered(20)
-            .replace("line 2\n", "line 2\nnew a\nnew b\n")
-            .replace("line 5\n", "line 5 better\n");
-        let mut s = reviewed_as(&f, &fixed);
-        let file = s.file.as_ref().unwrap();
-        let shown = &file.notes[&0];
-        assert!(
-            !shown.iter().any(|l| l.text.contains("anchor lost")),
-            "{shown:?}"
-        );
-        let note = file
-            .view
-            .rows
-            .iter()
-            .position(|r| matches!(r, Row::Note(_)))
-            .unwrap();
-        // The note sits under the line's new place, two lines down.
-        assert!(matches!(
-            file.view.rows[note - 1],
-            Row::Code { section, lines } if lines.iter().flatten().any(|i| {
-                file.sections[section].diff.lines[*i].text == "line 5 better"
-            })
-        ));
-        s.file.as_mut().unwrap().cursor = note;
-        press(&mut s, "a");
-        assert!(s.review.items.is_empty(), "{:?}", s.message);
-        assert!(f.git(&["diff", "--cached"]).contains("+line 5 better"));
-    }
-
-    #[test]
-    fn an_item_whose_rewritten_fix_is_already_staged_is_found_and_closes() {
-        let f = Fixture::new();
-        let mut s = reviewed(&f);
-        // Accepting a neighbour stages the whole hunk, this fix with it.
-        f.git(&["add", "a.txt"]);
-        s.refresh().unwrap();
-        let file = s.file.as_ref().unwrap();
-        let note = file
-            .view
-            .rows
-            .iter()
-            .position(|r| matches!(r, Row::Note(_)))
-            .unwrap();
-        let shown = &file.notes[&0];
-        assert!(
-            !shown.iter().any(|l| l.text.contains("anchor lost")),
-            "{shown:?}"
-        );
-        s.file.as_mut().unwrap().cursor = note;
-        press(&mut s, "a");
-        assert!(s.review.items.is_empty(), "{:?}", s.message);
-        // The last item closing completes the review, which says so instead.
-        assert!(s.complete());
-    }
-
     #[test]
     fn index_lines_map_to_where_the_working_tree_has_them() {
         let f = Fixture::new();
@@ -543,29 +319,5 @@ mod tests {
         let started = std::time::Instant::now();
         assert_eq!(changed_lines(diff), [1]);
         assert!(started.elapsed() < std::time::Duration::from_secs(1));
-    }
-
-    #[test]
-    fn pushing_back_replaces_the_done_item_with_an_open_one() {
-        let f = Fixture::new();
-        let mut s = reviewed(&f);
-        let note = s
-            .file
-            .as_ref()
-            .unwrap()
-            .view
-            .rows
-            .iter()
-            .position(|r| matches!(r, Row::Note(_)))
-            .unwrap();
-        s.file.as_mut().unwrap().cursor = note;
-        press(&mut s, "cstill unclear\n");
-        assert_eq!(s.review.items.len(), 1);
-        let item = &s.review.items[0];
-        assert!(!item.done);
-        assert_eq!(item.text, "still unclear");
-        assert_eq!(s.review.status, crate::review::Status::Open);
-        let text = std::fs::read_to_string(s.review_path().unwrap()).unwrap();
-        assert!(text.contains("status: open"), "{text}");
     }
 }

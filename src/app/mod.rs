@@ -1,6 +1,7 @@
 //! The state machine. `AppState` is plain data: it holds no terminal, no
 //! child process and no open handle, so every test builds one headless.
 
+mod accept;
 mod agent_choice;
 mod annotate;
 mod comments;
@@ -407,7 +408,9 @@ impl AppState {
     pub fn rebuild_tree(&mut self) {
         let current = self.tree.get(self.tree_cursor).map(|t| self.tree_key(t));
         let mut paths: Vec<String> = self.snapshot.files.iter().map(|f| f.path.clone()).collect();
-        for item in &self.review.items {
+        // A file stays listed for its items once its changes are gone, but
+        // not for accepted ones: those are a record, with nothing to look at.
+        for item in self.review.items.iter().filter(|i| !i.accepted) {
             if let Some(path) = item.scope.path()
                 && !paths.iter().any(|p| p == path)
             {

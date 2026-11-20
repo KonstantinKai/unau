@@ -292,6 +292,7 @@ fn draw_note(
                 kind,
                 done,
                 working,
+                accepted,
             } if index == 0 && remaining == 0 => {
                 let color = match kind {
                     Kind::Fix => colors.fix,
@@ -303,11 +304,20 @@ fn draw_note(
                 } else if working {
                     spans.push(Span::styled("~ ", style.fg(colors.info)));
                 }
-                spans.push(Span::styled(
-                    format!("[{}] ", kind.name()),
-                    style.fg(color).add_modifier(Modifier::BOLD),
-                ));
-                spans.push(Span::styled(text, style.fg(colors.text)));
+                if accepted {
+                    spans.push(Span::styled("accepted ", style.fg(colors.muted)));
+                    spans.push(Span::styled(
+                        format!("[{}] ", kind.name()),
+                        style.fg(colors.muted),
+                    ));
+                    spans.push(Span::styled(text, style.fg(colors.muted)));
+                } else {
+                    spans.push(Span::styled(
+                        format!("[{}] ", kind.name()),
+                        style.fg(color).add_modifier(Modifier::BOLD),
+                    ));
+                    spans.push(Span::styled(text, style.fg(colors.text)));
+                }
             }
             NoteStyle::Added => spans.push(Span::styled(text, style.fg(colors.added))),
             NoteStyle::Removed => spans.push(Span::styled(text, style.fg(colors.removed))),

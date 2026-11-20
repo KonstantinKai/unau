@@ -322,7 +322,7 @@ fn render_status(state: &AppState, frame: &mut Frame, area: Rect, colors: &Color
         Line::styled(message.text.clone(), Style::new().fg(color))
     } else {
         let open = state.review.open_items();
-        let done = state.review.items.len() - open;
+        let done = state.review.done_items();
         let file = state.review_path().and_then(|p| p.file_name()).map_or_else(
             || "no review file yet".to_owned(),
             |n| n.to_string_lossy().into_owned(),

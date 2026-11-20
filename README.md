@@ -46,8 +46,8 @@ person can all work from it.
    item it is on `[~]`, ticks it `[x]` with a note when done, and never stages.
 4. **Re-review.** unau picks the ticks up live (or later with `--continue`).
    Each ticked item shows its quoted lines against the code now. `a` accepts:
-   the fix is staged and the item leaves the file. `c` pushes back with a new
-   open item for the next run.
+   the fix is staged and the item stays in the file, marked accepted. `c`
+   pushes back with a new open item for the next run.
 5. **Done** when no item is open and nothing is left unstaged. Commit as you
    normally would; unau never commits.
 
@@ -102,8 +102,8 @@ path reading.
 
 The working tree view shows each file's unstaged lines and, under a `staged`
 strip, the lines already in the index. Staged means accepted: staged lines never
-appear in the review, and an annotation on lines you stage leaves the review
-(unau asks first).
+appear in the review. Staging the lines of an item the agent ticked accepts
+it; an open annotation on lines you stage leaves the review (unau asks first).
 
 In the files pane, each file starts with its git status: `M` modified, `A`
 added, `D` deleted, `?` untracked (a rename shows as a `D` and an `A`). After
@@ -186,7 +186,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `T` | pick a theme, previewed live; `Enter` saves it to your config |
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
-| `a` | accept a done item: stage its hunk, drop it from the review |
+| `a` | accept a done item: stage its hunk, keep it in the review marked accepted |
 | `Q` `Ctrl-c` | quit; asks first in a popup, naming open items never run or a running command (`[ui] confirm_quit = false` to skip). `y`, or the quit key again (`Ctrl-c` twice), answers yes |
 | `?` | help |
 
@@ -271,11 +271,12 @@ files:
 ## Re-review
 
 Reopen with `--review <file>`. A ticked item shows its quoted lines against
-what is there now. `a` stages the hunks that touch it and removes it from the
-file. `c` pushes back: the item becomes a new open one with your comment. A
-file that changed since the review was written carries a `Δ` in the file
-tree. When nothing is open and nothing is left unstaged, unau says the review
-is complete.
+what is there now. `a` stages the hunks that touch it and marks it
+`accepted` in the file: it stays, dimmed, as a record of what was taken, and
+agents leave it alone. `c` pushes back: the item becomes a new open one with
+your comment. A file that changed since the review was written carries a `Δ`
+in the file tree. When nothing is open and nothing is left unstaged, unau
+says the review is complete.
 
 If the agent rewrote every quoted line and nothing changed at the anchor,
 unau marks the item "anchor lost"; stage the fix by hand and delete the item.

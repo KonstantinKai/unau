@@ -9,6 +9,8 @@ pub const IN_PLACE_OF: &str = "in place of";
 pub const REPLACE_WITH: &str = "replace with";
 /// Fence language that marks a quote of removed lines.
 pub const REMOVED_LANG: &str = "diff";
+/// Word before the kind of an item the reviewer accepted.
+pub const ACCEPTED: &str = "accepted";
 
 pub fn write(review: &Review) -> String {
     let mut out = String::new();
@@ -60,7 +62,11 @@ fn write_item(out: &mut String, item: &Item) {
     } else {
         ' '
     };
-    let kind = item.kind.name();
+    let kind = if item.accepted {
+        format!("{ACCEPTED} {}", item.kind.name())
+    } else {
+        item.kind.name().to_owned()
+    };
     let (first, rest) = match item.text.split_once('\n') {
         Some((first, rest)) => (first, Some(rest)),
         None => (item.text.as_str(), None),

@@ -27,6 +27,7 @@ pub enum NoteStyle {
         kind: Kind,
         done: bool,
         working: bool,
+        accepted: bool,
     },
     Text,
     /// What the agent wrote under the item, such as the answer to a question.
@@ -417,7 +418,13 @@ fn rows_for(
 ) -> (Vec<Row>, BTreeMap<usize, Vec<NoteLine>>) {
     let mut placements = Vec::new();
     let mut notes = BTreeMap::new();
-    let target = file.annotatable();
+    // Notes sit under the working tree's lines; with nothing unstaged left,
+    // under the staged ones, which are the same lines.
+    let target = file.annotatable().or_else(|| {
+        file.sections
+            .iter()
+            .position(|s| s.kind == SectionKind::Staged)
+    });
     let changed = file.changed_lines();
     for (index, item) in items.iter().enumerate() {
         let belongs = match (&file.source, item.scope.path()) {
