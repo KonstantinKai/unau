@@ -307,7 +307,7 @@ pub fn next_name(dir: &Path, date: &str) -> String {
 
 /// Today's local date as `YYYY-MM-DD`.
 pub fn today() -> String {
-    jiff::Zoned::now().date().to_string()
+    jiff::ZonedDateTime::now().date().to_string()
 }
 
 pub fn load(path: &Path) -> Result<(Review, String)> {

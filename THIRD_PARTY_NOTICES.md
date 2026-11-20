@@ -8,7 +8,7 @@ unau itself (annodiff, Oniguruma, Catppuccin, Tokyo Night, Rosé Pine) are in
 
 ## Overview
 
-- MIT License: 140
+- MIT License: 139
 - Apache License 2.0: 2
 - Unicode License v3: 1
 - zlib License: 1
@@ -459,7 +459,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- mio 1.2.4
+- mio 1.2.5
 
 ~~~~text
 Copyright (c) 2014 Carl Lerche and other MIO contributors
@@ -488,7 +488,7 @@ THE SOFTWARE.
 
 Used by:
 
-- errno 0.3.14
+- errno 0.3.15
 
 ~~~~text
 Copyright (c) 2014 Chris Wong
@@ -524,8 +524,8 @@ DEALINGS IN THE SOFTWARE.
 Used by:
 
 - bitflags 2.13.2
-- log 0.4.34
-- regex-syntax 0.8.11
+- log 0.4.35
+- regex-syntax 0.8.12
 
 ~~~~text
 Copyright (c) 2014 The Rust Project Developers
@@ -560,7 +560,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- flate2 1.1.10
+- flate2 1.1.11
 
 ~~~~text
 Copyright (c) 2014-2026 Alex Crichton
@@ -631,7 +631,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- plist 1.10.1
+- plist 1.10.4
 
 ~~~~text
 Copyright (c) 2015 Edward Barnard
@@ -697,7 +697,7 @@ Used by:
 - heck 0.5.0
 - linked-hash-map 0.5.6
 - unicode-segmentation 1.13.3
-- unicode-width 0.2.2
+- unicode-width 0.2.3
 
 ~~~~text
 Copyright (c) 2015 The Rust Project Developers
@@ -761,7 +761,6 @@ SOFTWARE.
 
 Used by:
 
-- hashbrown 0.16.1
 - hashbrown 0.17.1
 
 ~~~~text
@@ -1078,7 +1077,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- smallvec 1.16.3
+- smallvec 1.16.6
 
 ~~~~text
 Copyright (c) 2018 The Servo Project Developers
@@ -1248,7 +1247,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- num_threads 0.1.7
+- num_threads 0.1.8
 
 ~~~~text
 Copyright (c) 2021 Jacob Pratt
@@ -1405,19 +1404,19 @@ Used by:
 - anstyle-query 1.1.5
 - anstyle-wincon 3.0.11
 - anstyle 1.0.14
-- clap 4.6.7
+- clap 4.6.9
 - clap_builder 4.6.7
-- clap_derive 4.6.7
-- clap_lex 1.1.1
+- clap_derive 4.6.9
+- clap_lex 1.1.2
 - colorchoice 1.0.5
 - is_terminal_polyfill 1.70.2
 - once_cell_polyfill 1.70.2
-- serde_spanned 1.1.2
-- toml 1.1.8+spec-1.1.0
-- toml_datetime 1.1.2+spec-1.1.0
-- toml_edit 0.25.17+spec-1.1.0
+- serde_spanned 1.1.3
+- toml 1.2.1+spec-1.1.0
+- toml_datetime 1.1.3+spec-1.1.0
+- toml_edit 0.25.19+spec-1.1.0
 - toml_parser 1.1.5+spec-1.1.0
-- toml_writer 1.1.3+spec-1.1.0
+- toml_writer 1.2.0+spec-1.1.0
 
 ~~~~text
 Copyright (c) Individual contributors
@@ -1505,7 +1504,7 @@ SOFTWARE.
 
 Used by:
 
-- libc 0.2.190
+- libc 0.2.191
 
 ~~~~text
 Copyright (c) The Rust Project Developers
@@ -1665,7 +1664,7 @@ SOFTWARE.
 
 Used by:
 
-- crc32fast 1.5.2
+- crc32fast 1.5.5
 
 ~~~~text
 MIT License
@@ -2141,21 +2140,21 @@ Used by:
 - anyhow 1.0.104
 - fastrand 2.5.0
 - indoc 2.0.8
-- itoa 1.0.18
+- itoa 1.0.19
 - linux-raw-sys 0.12.1
 - once_cell 1.21.4
 - portable-atomic-util 0.2.8
 - portable-atomic 1.15.0
 - proc-macro2 1.0.107
 - quote 1.0.47
-- rustix 1.1.5
+- rustix 1.1.6
 - rustversion 1.0.23
 - serde 1.0.229
 - serde_core 1.0.229
 - serde_derive 1.0.229
 - serde_json 1.0.154
 - syn 2.0.119
-- syn 3.0.9
+- syn 3.0.10
 - thiserror-impl 2.0.21
 - thiserror 2.0.21
 - unicode-ident 1.0.27
@@ -2226,7 +2225,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- winnow 1.0.4
+- winnow 1.0.5
 
 ~~~~text
 Permission is hereby granted, free of charge, to any person obtaining
@@ -2254,10 +2253,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- jiff-core 0.1.1
-- jiff-tzdb-platform 0.1.3
-- jiff-tzdb 0.1.9
-- jiff 0.2.38
+- jiff-core 1.0.1
+- jiff-tzdb-platform 1.0.0
+- jiff-tzdb 1.0.0
+- jiff 1.0.1
 - memchr 2.8.3
 - walkdir 2.5.0
 
@@ -2354,7 +2353,7 @@ SOFTWARE.
 
 Used by:
 
-- kasuari 0.4.12
+- kasuari 0.4.13
 
 ~~~~text
 The MIT License (MIT)
