@@ -339,6 +339,12 @@ impl AppState {
             } else if bottom > file.scroll + height {
                 file.scroll = bottom.saturating_sub(height).min(top);
             }
+            // A diff that got shorter (staged lines, a re-read) or a pane that
+            // grew would otherwise leave its top hidden above an empty stretch.
+            file.scroll = file
+                .scroll
+                .min(file.view.total().saturating_sub(height))
+                .min(top);
             file.highlight_screen(height, &self.layout.theme.syntax);
         }
         let tree_height = self.tree_height();
@@ -347,6 +353,12 @@ impl AppState {
         } else if self.tree_cursor >= self.tree_scroll + tree_height {
             self.tree_scroll = self.tree_cursor + 1 - tree_height;
         }
+        // A pane that grew (zoom off, comments pane closed) would otherwise
+        // leave rows hidden above an empty stretch below; `rebuild_tree` does
+        // the same for a tree that shrank.
+        self.tree_scroll = self
+            .tree_scroll
+            .min(self.tree.len().saturating_sub(tree_height));
         self.scroll_comments();
     }
 

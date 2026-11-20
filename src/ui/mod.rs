@@ -147,9 +147,24 @@ pub fn border(focused: bool, colors: &Colors) -> Style {
     })
 }
 
+/// ` ↑3 ↓12 `: how many of `total` lines are out of view above and below a
+/// pane showing `height` of them from `top`, or nothing when all show.
+pub fn hidden_lines(total: usize, top: usize, height: usize) -> Option<String> {
+    let above = top;
+    let below = total.saturating_sub(top + height);
+    let mut parts = Vec::new();
+    if above > 0 {
+        parts.push(format!("↑{above}"));
+    }
+    if below > 0 {
+        parts.push(format!("↓{below}"));
+    }
+    (!parts.is_empty()).then(|| format!(" {} ", parts.join(" ")))
+}
+
 fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) {
     let focused = state.focus == Pane::Tree;
-    let block = Block::new()
+    let mut block = Block::new()
         .borders(Borders::ALL)
         .border_style(border(focused, colors))
         .title(pane_title(
@@ -158,6 +173,15 @@ fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors)
             &files_title(state),
             colors,
         ));
+    let height = usize::from(area.height.saturating_sub(2));
+    // Never rows hidden above an empty stretch below, however the pane grew.
+    let top = state
+        .tree_scroll
+        .min(state.tree.len().saturating_sub(height));
+    if let Some(hint) = hidden_lines(state.tree.len(), top, height) {
+        block =
+            block.title_bottom(Line::styled(hint, Style::new().fg(colors.muted)).right_aligned());
+    }
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let open: Option<&str> = state.file.as_ref().and_then(|f| f.path());
@@ -165,7 +189,7 @@ fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors)
         .tree
         .iter()
         .enumerate()
-        .skip(state.tree_scroll)
+        .skip(top)
         .take(usize::from(inner.height))
         .map(|(i, row)| {
             let mut spans = vec![Span::raw("  ".repeat(row.depth))];

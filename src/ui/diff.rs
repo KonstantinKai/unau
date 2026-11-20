@@ -22,10 +22,24 @@ pub const SEPARATOR: &str = "··· unchanged lines omitted · z: expand nearby 
 
 pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) {
     let focused = state.focus == Pane::Diff;
-    let block = Block::new()
+    let mut block = Block::new()
         .borders(Borders::ALL)
         .border_style(border(focused, colors))
         .title(header(state, colors));
+    let height = usize::from(area.height.saturating_sub(2));
+    // Never lines hidden above an empty stretch below, however the diff shrank.
+    let top = state
+        .file
+        .as_ref()
+        .map_or(0, |f| f.scroll.min(f.view.total().saturating_sub(height)));
+    if let Some(hint) = state
+        .file
+        .as_ref()
+        .and_then(|f| super::hidden_lines(f.view.total(), top, height))
+    {
+        block =
+            block.title_bottom(Line::styled(hint, Style::new().fg(colors.muted)).right_aligned());
+    }
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let Some(file) = &state.file else {
@@ -43,7 +57,7 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
     let width = usize::from(inner.width);
     let selected = file.anchor.map(|_| file.selected_rows());
     let mut lines = Vec::new();
-    for visual in file.scroll..file.scroll + usize::from(inner.height) {
+    for visual in top..top + usize::from(inner.height) {
         let Some(row) = file.view.row_at(visual) else {
             break;
         };

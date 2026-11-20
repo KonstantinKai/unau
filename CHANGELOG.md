@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The files pane and the diff could stay scrolled down after they had room
+  for more, for example after zooming the diff and back, folding folders, or
+  staging most of a diff: the top stayed hidden above an empty stretch, at
+  worst showing nothing but an "unchanged lines omitted" row, with nothing to
+  say so. Both now fill from the top when everything fits, and each pane's
+  bottom border shows how much is out of view above and below (`↑3 ↓12`:
+  rows in the files pane, lines in the diff).
+
 ## 0.5.2 - 2026-11-18
 
 ### Fixed

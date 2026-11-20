@@ -437,6 +437,9 @@ impl AppState {
             self.tree_cursor = at;
         }
         self.tree_cursor = self.tree_cursor.min(self.tree.len().saturating_sub(1));
+        self.tree_scroll = self
+            .tree_scroll
+            .min(self.tree.len().saturating_sub(self.tree_height()));
     }
 
     /// Identifies a tree row across rebuilds: a file or directory path.

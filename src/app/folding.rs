@@ -239,4 +239,46 @@ mod tests {
         press(&mut s, "l");
         assert_eq!(s.focus, crate::app::Pane::Diff);
     }
+
+    #[test]
+    fn a_files_pane_with_room_for_every_row_shows_them_from_the_top() {
+        let f = Fixture::new();
+        for i in 0..30 {
+            f.write(&format!("d/f{i:02}.txt"), "a\n");
+        }
+        f.commit_all("init");
+        for i in 0..30 {
+            f.write(&format!("d/f{i:02}.txt"), "b\n");
+        }
+        let mut s = state(&f);
+        s.focus = crate::app::Pane::Tree;
+        s.resize(100, 15);
+        press(&mut s, "G");
+        assert!(s.tree_scroll > 0);
+        // Zoom off or a taller window: every row fits, none stays hidden.
+        s.resize(100, 60);
+        assert_eq!(s.tree_scroll, 0);
+        // Folding a long stretch away does the same.
+        s.resize(100, 15);
+        press(&mut s, "G");
+        press(&mut s, "W");
+        assert_eq!(s.tree_scroll, 0);
+    }
+
+    #[test]
+    fn a_diff_with_room_for_every_line_shows_them_from_the_top() {
+        let f = Fixture::new();
+        let body = crate::git::fixture::numbered(80);
+        f.write("a.txt", &body);
+        f.commit_all("init");
+        f.write("a.txt", &body.replace("line ", "row "));
+        let mut s = state(&f);
+        s.focus = crate::app::Pane::Diff;
+        s.resize(100, 20);
+        press(&mut s, "G");
+        assert!(s.file.as_ref().unwrap().scroll > 0);
+        // Taller than the whole diff: every line fits, none stays hidden.
+        s.resize(100, 400);
+        assert_eq!(s.file.as_ref().unwrap().scroll, 0);
+    }
 }
