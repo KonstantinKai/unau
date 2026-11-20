@@ -95,7 +95,7 @@ impl AppState {
         if self.review.files.contains_key(path) {
             return;
         }
-        if let Ok(blob) = self.repo.blob(&self.target, path) {
+        if let Ok(blob) = self.repo.store_blob(&self.target, path) {
             self.review.files.insert(path.to_owned(), blob);
         }
     }

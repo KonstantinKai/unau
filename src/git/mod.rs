@@ -23,6 +23,8 @@ pub const REVIEW_DIR: &str = ".unau";
 
 /// The SHA-1 of git's empty tree, used as the parent of a root commit.
 const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+/// Stands in for a blob id when the file is not in the working tree.
+const DELETED: &str = "deleted";
 
 /// What is being reviewed.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -176,16 +178,43 @@ impl Repo {
 
     /// Blob id of `path` on the new side of `target`, without writing an object.
     pub fn blob(&self, target: &Target, path: &str) -> Result<String> {
+        self.blob_id(target, path, false)
+    }
+
+    /// As `blob`, and for the working tree also keeps the file's contents as
+    /// an object in `.git`, so `read_blob` can give them back after the file
+    /// changed. Nothing in the working tree or the index is touched; git
+    /// prunes the object in time, as it does any unreferenced one.
+    pub fn store_blob(&self, target: &Target, path: &str) -> Result<String> {
+        self.blob_id(target, path, true)
+    }
+
+    fn blob_id(&self, target: &Target, path: &str, write: bool) -> Result<String> {
         let id = match target {
             Target::WorkTree => {
                 if !self.root.join(path).is_file() {
-                    return Ok("deleted".to_owned());
+                    return Ok(DELETED.to_owned());
                 }
-                self.run(&["hash-object", "--", path])?
+                let write: &[&str] = if write { &["-w"] } else { &[] };
+                let args: Vec<&str> = ["hash-object"]
+                    .iter()
+                    .chain(write)
+                    .chain(&["--", path])
+                    .copied()
+                    .collect();
+                self.run(&args)?
             }
             Target::Range { to, .. } => self.run(&["rev-parse", &format!("{to}:{path}")])?,
         };
         Ok(id.trim().to_owned())
+    }
+
+    /// Contents of the blob `id`, when git has it.
+    pub fn read_blob(&self, id: &str) -> Result<String> {
+        if id == DELETED {
+            bail!("the file was deleted");
+        }
+        self.run(&["cat-file", "blob", id])
     }
 
     /// Contents of `path` on the new side of `target`.

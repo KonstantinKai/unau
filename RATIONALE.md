@@ -54,7 +54,13 @@ The review file's shape (a dated Markdown checklist with a frontmatter
    on it. annodiff's JSON state was the shape rejected.
 5. **Anchors on the new side, with the lines quoted.** `path:start-end` names
    lines the agent can open; the quote lets it re-find them after line numbers
-   drift, which they always do once it starts editing.
+   drift, which they always do once it starts editing. unau itself re-finds
+   them from the file as it was reviewed, kept as a git object when the first
+   comment on it is made, mapped line by line to now: a fix that rewrote the
+   quoted lines and moved them leaves nothing for a quote to match, and a
+   guess by line number then took unrelated lines. A git object adds no file
+   to the working tree or the review folder, and git prunes it in time; the
+   quote is the fallback after that.
 6. **Agent-agnostic.** The tool knows one thing about agents: a command line
    with `{file}` in it. No SDKs, sockets or sessions, so any agent, script or
    person can do the work, and nothing breaks when an agent changes its API.

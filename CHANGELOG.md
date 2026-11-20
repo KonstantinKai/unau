@@ -14,6 +14,13 @@
 
 ### Fixed
 
+- When the agent rewrote the lines a comment quoted past recognition and
+  also added or removed lines above them, re-review could not find the
+  comment ("anchor lost", and `a` refused it), or, worse, placed it on
+  unrelated lines that `a` then staged. unau now keeps the version of each
+  file you commented on as a git object and maps its lines to the file now,
+  so every comment lands where its lines went. Reviews written before this
+  version still use the quoted lines.
 - A file whose changes were all staged showed its comments at the top of the
   diff instead of under their lines.
 - The files pane and the diff could stay scrolled down after they had room

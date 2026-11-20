@@ -32,7 +32,12 @@ impl AppState {
         }
         let region = match &item.scope {
             Scope::Lines { .. } => {
-                let found = find_region(&item, &file.new_text, &file.changed_lines());
+                let found = find_region(
+                    &item,
+                    &file.new_text,
+                    file.reviewed.as_ref(),
+                    &file.changed_lines(),
+                );
                 let Some(region) = found else {
                     self.error("anchor lost: stage the fix with s, then delete the item with x");
                     return;
@@ -220,7 +225,8 @@ mod tests {
         // second `a` leaves it be.
         let text = std::fs::read_to_string(s.review_path().unwrap()).unwrap();
         assert!(text.contains("- [x] accepted fix"), "{text}");
-        assert!(note_under(&s, 0, "line 5 good"));
+        // The line became two; the note sits under the last.
+        assert!(note_under(&s, 0, "line 5b"));
         let file = s.file.as_mut().unwrap();
         file.cursor = file
             .view
@@ -250,6 +256,44 @@ mod tests {
         press(&mut s, "a");
         assert!(s.review.items[0].accepted, "{:?}", s.message);
         assert!(f.git(&["diff", "--cached"]).contains("+line 5 better"));
+    }
+
+    #[test]
+    fn two_fixes_rewritten_past_recognition_and_moved_are_each_accepted() {
+        let f = Fixture::new();
+        let body = crate::git::fixture::numbered(40);
+        f.write("a.txt", &body);
+        f.commit_all("init");
+        let bad = body
+            .replace("line 5\n", "line 5 bad\n")
+            .replace("line 20\n", "line 20 bad\n");
+        f.write("a.txt", &bad);
+        let mut s = state(&f);
+        s.focus = Pane::Diff;
+        comment_on(&mut s, "line 5 bad", "first");
+        comment_on(&mut s, "line 20 bad", "second");
+        // Lines added above both, and both lines rewritten so that nothing of
+        // them is left to recognise.
+        let fixed = bad
+            .replace("line 2\n", "line 2\nnew a\nnew b\nnew c\n")
+            .replace("line 5 bad\n", "zzz qqq www\n")
+            .replace("line 20 bad\n", "kkk mmm ppp\n");
+        let mut s = reopen_ticked(&f, &s, &fixed);
+        assert!(note_under(&s, 0, "zzz qqq www"));
+        assert!(note_under(&s, 1, "kkk mmm ppp"));
+        on_waiting_note(&mut s);
+        press(&mut s, "a");
+        assert!(s.review.items[0].accepted, "{:?}", s.message);
+        let staged = f.git(&["diff", "--cached"]);
+        assert!(staged.contains("+zzz qqq www"), "{staged}");
+        assert!(
+            !staged.contains("+kkk mmm ppp"),
+            "the second fix waits: {staged}"
+        );
+        on_waiting_note(&mut s);
+        press(&mut s, "a");
+        assert!(s.review.items[1].accepted, "{:?}", s.message);
+        assert!(f.git(&["diff", "--cached"]).contains("+kkk mmm ppp"));
     }
 
     #[test]

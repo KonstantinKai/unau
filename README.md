@@ -263,7 +263,10 @@ files:
   line the removal sits before.
 - Fences grow longer than any backtick run inside them, so quoted Markdown
   cannot break the file.
-- `files:` holds the blob id of each annotated file at review time.
+- `files:` holds the blob id of each annotated file at review time. In the
+  working tree, unau also keeps that version of the file as an object in
+  `.git` (never in the working tree or the index), so re-review can follow
+  every line to where it is now.
 - The agent ticks items and sets `status`. unau never writes `done`. If the
   agent edits the file while unau runs, unau merges: the agent's ticks win
   and unau's own changes go on top.
@@ -278,8 +281,11 @@ your comment. A file that changed since the review was written carries a `Δ`
 in the file tree. When nothing is open and nothing is left unstaged, unau
 says the review is complete.
 
-If the agent rewrote every quoted line and nothing changed at the anchor,
-unau marks the item "anchor lost"; stage the fix by hand and delete the item.
+Items are found again by the version of the file you commented on, which
+unau keeps in `.git`, so a fix that rewrote the lines and moved them still
+lands in the right place. Git prunes that copy after a few weeks; an older
+review falls back to the quoted lines, and when even they are gone unau marks
+the item "anchor lost": stage the fix by hand and delete the item.
 
 ## Agent instructions
 

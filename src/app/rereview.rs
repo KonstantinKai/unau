@@ -1,7 +1,7 @@
 //! Re-review: finding anchors again after the agent changed the file,
 //! showing what changed, and accepting a fix by staging it.
 
-use super::{NoteLine, NoteStyle};
+use super::{NoteLine, NoteStyle, reviewed::Reviewed};
 use crate::{
     git::{FileDiff, LineKind},
     review::{Item, Scope},
@@ -30,11 +30,17 @@ pub fn quote_at(item: &Item, text: &[String], p: usize) -> bool {
 }
 
 /// Where an item's lines are in `new_text` now. Tries the anchor, then the
+/// file as it was reviewed (`reviewed`), mapped line by line to now, then the
 /// quoted lines anywhere (nearest wins), then the first or last quoted line
 /// alone, then the changed lines that read most like the quote, then the
 /// anchor itself if a change in `changed` (new-side lines the changes touch,
 /// staged ones included) lands on it. `None` means the anchor is lost.
-pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Option<Region> {
+pub fn find_region(
+    item: &Item,
+    new_text: &[String],
+    reviewed: Option<&Reviewed>,
+    changed: &[usize],
+) -> Option<Region> {
     let Scope::Lines {
         start,
         end,
@@ -54,6 +60,9 @@ pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Optio
         |candidates: Vec<usize>| candidates.into_iter().min_by_key(|p| p.abs_diff(start - 1));
     if at(start - 1) {
         return Some(Region { start, end });
+    }
+    if let Some(region) = reviewed.and_then(|r| r.map(item)) {
+        return Some(region);
     }
     if let Some(p) = nearest((0..new_text.len()).filter(|p| at(*p)).collect()) {
         return Some(Region {
@@ -84,7 +93,7 @@ pub fn find_region(item: &Item, new_text: &[String], changed: &[usize]) -> Optio
         return Some(region);
     }
     // Edited, and maybe moved too: the changed stretch most like the quote.
-    if let Some(region) = super::similar::closest(item, new_text, changed) {
+    if let Some(region) = super::likeness::closest(item, new_text, changed) {
         return Some(region);
     }
     // The quoted lines were all rewritten in place: the change sits on the anchor.
@@ -230,7 +239,7 @@ mod tests {
         let now = texts(&["new", "new", "a", "b", "c"]);
         let item = lines_item(1, 2, &["a", "b"]);
         assert_eq!(
-            find_region(&item, &now, &[]),
+            find_region(&item, &now, None, &[]),
             Some(Region { start: 3, end: 4 })
         );
     }
@@ -239,10 +248,13 @@ mod tests {
     fn region_survives_a_changed_middle_and_is_lost_when_all_lines_changed() {
         let now = texts(&["a", "B", "c"]);
         assert_eq!(
-            find_region(&lines_item(1, 3, &["a", "b", "c"]), &now, &[]),
+            find_region(&lines_item(1, 3, &["a", "b", "c"]), &now, None, &[]),
             Some(Region { start: 1, end: 3 })
         );
-        assert_eq!(find_region(&lines_item(1, 1, &["z"]), &now, &[]), None);
+        assert_eq!(
+            find_region(&lines_item(1, 1, &["z"]), &now, None, &[]),
+            None
+        );
     }
 
     #[test]
@@ -253,7 +265,7 @@ mod tests {
         let mut now = texts(&["new a", "new b"]);
         now.extend(original);
         assert_eq!(
-            find_region(&item, &now, &[]),
+            find_region(&item, &now, None, &[]),
             Some(Region { start: 3, end: 22 })
         );
         let diff = quote_diff(&item, &now[2..]);
@@ -265,10 +277,13 @@ mod tests {
     fn a_rewritten_line_is_found_where_the_change_sits() {
         let now = texts(&["a", "B", "c"]);
         assert_eq!(
-            find_region(&lines_item(2, 2, &["b"]), &now, &[2]),
+            find_region(&lines_item(2, 2, &["b"]), &now, None, &[2]),
             Some(Region { start: 2, end: 2 })
         );
-        assert_eq!(find_region(&lines_item(2, 2, &["b"]), &now, &[3]), None);
+        assert_eq!(
+            find_region(&lines_item(2, 2, &["b"]), &now, None, &[3]),
+            None
+        );
     }
 
     #[test]

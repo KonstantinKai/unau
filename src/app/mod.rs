@@ -10,6 +10,7 @@ mod filter;
 mod folding;
 mod goto;
 mod input;
+mod likeness;
 mod navigate;
 mod notes;
 mod open;
@@ -17,9 +18,9 @@ mod persist;
 mod picker;
 mod rereview;
 mod resume;
+mod reviewed;
 mod runlog;
 mod settings;
-mod similar;
 mod stage;
 
 pub use agent_choice::AgentChoice;

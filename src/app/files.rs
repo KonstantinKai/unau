@@ -1,7 +1,7 @@
 //! The open file: its rows, notes, wrapping and highlighting, all computed in
 //! the update step so rendering only reads.
 
-use super::{AppState, Pane, notes, rereview};
+use super::{AppState, Pane, notes, rereview, reviewed::Reviewed};
 use crate::{
     config::LineNumbers,
     diff::{self, Highlighting, Row, SectionView, View, wrap_ranges},
@@ -53,6 +53,9 @@ pub struct FileState {
     pub view: View,
     /// The file on the new side, line by line, for quoting and re-finding anchors.
     pub new_text: Vec<String>,
+    /// The file as it was when first commented on, mapped to `new_text`, when
+    /// the review recorded it and git still has it.
+    pub reviewed: Option<Reviewed>,
     /// Display lines per note row, by item index.
     pub notes: BTreeMap<usize, Vec<NoteLine>>,
     /// Highlighting, filled in as lines come into view.
@@ -237,6 +240,14 @@ impl AppState {
                 .collect(),
             Source::General => Vec::new(),
         };
+        let path = match &source {
+            Source::File(path) => Some(path.as_str()),
+            Source::General => None,
+        };
+        let reviewed = path
+            .and_then(|path| self.review.files.get(path))
+            .and_then(|sha| self.repo.read_blob(sha).ok())
+            .map(|text| Reviewed::new(text.lines().map(str::to_owned).collect(), &new_text));
         let digits = sections
             .iter()
             .flat_map(|s| &s.diff.lines)
@@ -256,6 +267,7 @@ impl AppState {
             source,
             view: View::default(),
             new_text,
+            reviewed,
             notes: BTreeMap::new(),
             highlight,
             digits,
@@ -435,7 +447,7 @@ fn rows_for(
         if !belongs {
             continue;
         }
-        let region = rereview::find_region(item, &file.new_text, &changed);
+        let region = rereview::find_region(item, &file.new_text, file.reviewed.as_ref(), &changed);
         let line = match (&item.scope, target) {
             (
                 Scope::Lines {

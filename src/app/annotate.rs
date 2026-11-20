@@ -271,7 +271,12 @@ impl AppState {
                 ..
             },
         ) = (&self.file, &old.scope)
-            && let Some(region) = rereview::find_region(&old, &file.new_text, &file.changed_lines())
+            && let Some(region) = rereview::find_region(
+                &old,
+                &file.new_text,
+                file.reviewed.as_ref(),
+                &file.changed_lines(),
+            )
         {
             item.scope = Scope::Lines {
                 path: path.clone(),
