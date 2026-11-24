@@ -37,6 +37,7 @@ pub fn template() -> String {
          # confirm_quit = true             # Q asks before quitting\n\
          # check_updates = true            # look for a new release once a day; installer-script installs update themselves\n\
          # background = \"theme\"           # theme | terminal (keep the terminal's, transparency included)\n\
+         # scroll = \"scrollbar\"           # scrollbar | hint (↑3 ↓12 on the pane's bottom border)\n\
          \n[review]\n",
     );
     let _ = writeln!(

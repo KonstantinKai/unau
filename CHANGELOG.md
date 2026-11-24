@@ -2,8 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- A scrollbar: every pane that scrolls (files, diff, comments, run) and the
+  keys popup show a dim track with a brighter thumb, as long as the share in
+  view, in their last column whenever something is out of view. That
+  column stays free while the scrollbar is on, so text never re-wraps when
+  it appears. `[ui] scroll = "hint"` shows the `↑3 ↓12` counts on the
+  bottom border instead, as 0.6.0 did, and gives the column back.
+
 ### Changed
 
+- The keys popup (`?`) takes at most 60% of the screen's height and scrolls:
+  `j`/`k` (or `Down`/`Up`) move through the list and `G` goes to its end.
+  `Esc` or `?` closes it; other keys no longer do, so a stray press does not
+  close it halfway through reading.
 - A tall popup no longer sticks to the top of the screen: popups are still
   lifted above the middle, but by at most half the room above them.
 

@@ -9,6 +9,9 @@ mod goto;
 mod picker;
 mod prompt;
 mod runpane;
+mod scroll;
+
+use scroll::Scroll;
 
 use crate::{
     app::{AppState, Level, Pane},
@@ -147,24 +150,9 @@ pub fn border(focused: bool, colors: &Colors) -> Style {
     })
 }
 
-/// ` ↑3 ↓12 `: how many of `total` lines are out of view above and below a
-/// pane showing `height` of them from `top`, or nothing when all show.
-pub fn hidden_lines(total: usize, top: usize, height: usize) -> Option<String> {
-    let above = top;
-    let below = total.saturating_sub(top + height);
-    let mut parts = Vec::new();
-    if above > 0 {
-        parts.push(format!("↑{above}"));
-    }
-    if below > 0 {
-        parts.push(format!("↓{below}"));
-    }
-    (!parts.is_empty()).then(|| format!(" {} ", parts.join(" ")))
-}
-
 fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) {
     let focused = state.focus == Pane::Tree;
-    let mut block = Block::new()
+    let block = Block::new()
         .borders(Borders::ALL)
         .border_style(border(focused, colors))
         .title(pane_title(
@@ -178,10 +166,12 @@ fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors)
     let top = state
         .tree_scroll
         .min(state.tree.len().saturating_sub(height));
-    if let Some(hint) = hidden_lines(state.tree.len(), top, height) {
-        block =
-            block.title_bottom(Line::styled(hint, Style::new().fg(colors.muted)).right_aligned());
-    }
+    let marks = Scroll {
+        total: state.tree.len(),
+        top,
+        shown: height,
+    };
+    let block = scroll::with_hint(state, block, marks, colors);
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let open: Option<&str> = state.file.as_ref().and_then(|f| f.path());
@@ -226,7 +216,8 @@ fn render_tree(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors)
             line
         })
         .collect();
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), scroll::text_area(state, inner));
+    scroll::scrollbar(state, frame, inner, marks, focused, colors);
 }
 
 /// `files`, then the filter and how many of the files it shows.
@@ -397,14 +388,10 @@ fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
         .unwrap_or(0);
     let wanted = u16::try_from(widest).unwrap_or(u16::MAX) + 2 * POPUP_PADDING + 2;
     let width = area.width.min(wanted);
-    let height = area
-        .height
-        .min(u16::try_from(Action::ALL.len() + 4).unwrap_or(u16::MAX));
+    let height = crate::app::help_height(area.height);
     let popup = Rect {
         x: area.x + (area.width - width) / 2,
-        // Help is tall, so it is centred plainly rather than lifted like the
-        // small popups.
-        y: area.y + (area.height - height) / 2,
+        y: prompt::lifted_top(area, height),
         width,
         height,
     };
@@ -427,12 +414,31 @@ fn render_help(state: &AppState, frame: &mut Frame, colors: &Colors) {
             ])
         })
         .collect();
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(popup_block(colors, colors.border_active).title(" keys · any key closes ")),
-        popup,
+    let shown = usize::from(height.saturating_sub(2));
+    let top = state.help_scroll.min(lines.len().saturating_sub(shown));
+    let marks = Scroll {
+        total: lines.len(),
+        top,
+        shown,
+    };
+    let block = scroll::with_hint(
+        state,
+        popup_block(colors, colors.border_active).title(" keys · j/k scroll · Esc closes "),
+        marks,
+        colors,
     );
+    let lines: Vec<Line> = lines.into_iter().skip(top).collect();
+    frame.render_widget(Clear, popup);
+    frame.render_widget(Paragraph::new(lines).block(block), popup);
+    // The popup's right padding column holds the bar, so its text keeps
+    // every column it had.
+    let inside = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
+    scroll::scrollbar(state, frame, inside, marks, true, colors);
 }
 
 /// `(keys, description, disabled)` for every action, as the help shows them.

@@ -3,9 +3,11 @@
 
 mod keys;
 mod template;
+mod ui;
 
 pub use keys::{Action, Key, KeyCodeKey, Lookup, format_keys, lookup, parse_keys};
 pub use template::template;
+pub use ui::{Background, LineNumbers, ScrollStyle};
 
 use crate::theme::{self, Theme};
 use anyhow::{Context, Result, bail};
@@ -100,25 +102,6 @@ pub enum ThemeMode {
     Dark,
 }
 
-/// Who paints behind the text.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Background {
-    /// The theme's own `background`, so any theme reads right on any terminal.
-    #[default]
-    Theme,
-    /// The terminal's, transparency included.
-    Terminal,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LineNumbers {
-    #[default]
-    Both,
-    New,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     /// Key sequence to action. Every action has at least one binding.
@@ -146,6 +129,8 @@ pub struct Config {
     /// background when unau came from its installer script.
     pub check_updates: bool,
     pub background: Background,
+    /// `[ui] scroll`: how panes show that more is out of view.
+    pub scroll: ScrollStyle,
     pub theme_mode: ThemeMode,
     /// Theme names as configured; a user theme may replace a built-in one.
     pub dark_name: String,
@@ -207,6 +192,7 @@ struct UiSection {
     confirm_quit: Option<bool>,
     check_updates: Option<bool>,
     background: Option<Background>,
+    scroll: Option<ScrollStyle>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -239,6 +225,7 @@ impl Default for Config {
             confirm_quit: true,
             check_updates: true,
             background: Background::Theme,
+            scroll: ScrollStyle::Scrollbar,
             theme_mode: ThemeMode::Auto,
             dark_name: theme::CATPPUCCIN_MACCHIATO.name.into_owned(),
             light_name: theme::CATPPUCCIN_LATTE.name.into_owned(),
@@ -325,6 +312,9 @@ impl Config {
         }
         if let Some(background) = file.ui.background {
             self.background = background;
+        }
+        if let Some(scroll) = file.ui.scroll {
+            self.scroll = scroll;
         }
         if let Some(confirm) = file.ui.confirm_quit {
             self.confirm_quit = confirm;

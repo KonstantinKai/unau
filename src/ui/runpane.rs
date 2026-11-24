@@ -3,7 +3,7 @@
 use super::{border, pane_title};
 use crate::{
     app::{AppState, Pane, RunLog, RunStatus, follow_top, format_elapsed},
-    config::Action,
+    config::{Action, ScrollStyle},
     runline::{RunLine, Seg},
     theme::Colors,
 };
@@ -67,7 +67,8 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
         }
         _ => Cow::Borrowed(&log.lines),
     };
-    let (width, height) = (usize::from(inner.width), usize::from(inner.height));
+    let text = super::scroll::text_area(state, inner);
+    let (width, height) = (usize::from(text.width), usize::from(text.height));
     let top = log
         .scroll
         .unwrap_or_else(|| follow_top(&lines, width, height));
@@ -84,7 +85,18 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
             )
         })
         .collect();
-    frame.render_widget(Paragraph::new(body), inner);
+    frame.render_widget(Paragraph::new(body), text);
+    // Its bottom border holds the keys, so the run pane shows only the
+    // scrollbar; counted in wrapped rows, since that is what scrolls by.
+    if state.config.scroll == ScrollStyle::Scrollbar {
+        let rows = |lines: &[RunLine]| lines.iter().map(|l| l.rows(width).len()).sum::<usize>();
+        let marks = super::Scroll {
+            total: rows(&lines),
+            top: rows(&lines[..top.min(lines.len())]),
+            shown: height,
+        };
+        super::scroll::scrollbar(state, frame, inner, marks, state.focus == Pane::Run, colors);
+    }
 }
 
 fn style(seg: Seg, colors: &Colors) -> Style {

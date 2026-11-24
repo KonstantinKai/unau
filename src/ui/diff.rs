@@ -1,7 +1,7 @@
 //! The diff pane: header, line-number gutter, omitted-lines separator, selection
 //! band, inline notes, unified or side by side.
 
-use super::border;
+use super::{Scroll, border};
 use crate::{
     app::{AppState, FileState, NoteStyle, Pane, Source},
     config::{Action, LineNumbers},
@@ -22,24 +22,23 @@ pub const SEPARATOR: &str = "··· unchanged lines omitted · z: expand nearby 
 
 pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) {
     let focused = state.focus == Pane::Diff;
-    let mut block = Block::new()
+    let block = Block::new()
         .borders(Borders::ALL)
         .border_style(border(focused, colors))
         .title(header(state, colors));
     let height = usize::from(area.height.saturating_sub(2));
+    let total = state.file.as_ref().map_or(0, |f| f.view.total());
     // Never lines hidden above an empty stretch below, however the diff shrank.
     let top = state
         .file
         .as_ref()
-        .map_or(0, |f| f.scroll.min(f.view.total().saturating_sub(height)));
-    if let Some(hint) = state
-        .file
-        .as_ref()
-        .and_then(|f| super::hidden_lines(f.view.total(), top, height))
-    {
-        block =
-            block.title_bottom(Line::styled(hint, Style::new().fg(colors.muted)).right_aligned());
-    }
+        .map_or(0, |f| f.scroll.min(total.saturating_sub(height)));
+    let marks = Scroll {
+        total,
+        top,
+        shown: height,
+    };
+    let block = super::scroll::with_hint(state, block, marks, colors);
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let Some(file) = &state.file else {
@@ -54,7 +53,8 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
         );
         return;
     };
-    let width = usize::from(inner.width);
+    let text = super::scroll::text_area(state, inner);
+    let width = usize::from(text.width);
     let selected = file.anchor.map(|_| file.selected_rows());
     let mut lines = Vec::new();
     for visual in top..top + usize::from(inner.height) {
@@ -78,7 +78,8 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
         }
         lines.push(line);
     }
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), text);
+    super::scroll::scrollbar(state, frame, inner, marks, focused, colors);
 }
 
 fn header(state: &AppState, colors: &Colors) -> Line<'static> {

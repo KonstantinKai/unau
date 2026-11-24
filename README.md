@@ -188,7 +188,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
 | `a` | accept a done item: stage its hunk, keep it in the review marked accepted |
 | `Q` `Ctrl-c` | quit; asks first in a popup, naming open items never run or a running command (`[ui] confirm_quit = false` to skip). `y`, or the quit key again (`Ctrl-c` twice), answers yes |
-| `?` | help |
+| `?` | help: every key; `j`/`k` (or `Down`/`Up`) scroll it, `G` to its end, `Esc` or `?` closes |
 
 The scroll keys (`Ctrl-e`/`Ctrl-y`, `Ctrl-d`/`Ctrl-u`, `Ctrl-f`/`Ctrl-b`) move
 the diff from the files and comments panes too, without leaving them; in the
@@ -392,6 +392,7 @@ line_numbers = "both"        # both | new
 confirm_quit = true          # Q asks before quitting
 check_updates = true         # look for a new release once a day (see Updates)
 background = "theme"         # theme | terminal (keep the terminal's own, transparency included)
+scroll = "scrollbar"         # scrollbar | hint (↑3 ↓12 on the pane's bottom border): how panes show what is out of view
 
 [review]
 quote_lines = 12             # longer quotes keep their first & last 3 lines; 0 = never cap

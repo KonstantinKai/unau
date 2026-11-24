@@ -35,8 +35,7 @@ impl AppState {
             return Effect::None;
         }
         if self.help {
-            self.help = false;
-            return Effect::None;
+            return self.help_key(key);
         }
         if key.code == KeyCodeKey::Esc
             && self.pressed.is_empty()
@@ -144,7 +143,7 @@ impl AppState {
             Action::OpenFile => return self.open_file(),
             Action::Accept => self.accept(),
             Action::Quit => return self.quit(),
-            Action::Help => self.help = true,
+            Action::Help => self.open_help(),
         }
         Effect::None
     }

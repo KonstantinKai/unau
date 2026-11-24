@@ -46,9 +46,15 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
             ),
             colors,
         ));
+    let pane = &state.comments;
+    let marks = super::Scroll {
+        total: pane.rows.len(),
+        top: pane.scroll,
+        shown: usize::from(area.height.saturating_sub(2)),
+    };
+    let block = super::scroll::with_hint(state, block, marks, colors);
     let inner = block.inner(area);
     frame.render_widget(block, area);
-    let pane = &state.comments;
     let lines: Vec<Line> = pane
         .rows
         .iter()
@@ -108,5 +114,6 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
     } else {
         lines
     };
-    frame.render_widget(Paragraph::new(body), inner);
+    frame.render_widget(Paragraph::new(body), super::scroll::text_area(state, inner));
+    super::scroll::scrollbar(state, frame, inner, marks, focused, colors);
 }

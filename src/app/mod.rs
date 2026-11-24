@@ -9,6 +9,7 @@ mod files;
 mod filter;
 mod folding;
 mod goto;
+mod help;
 mod input;
 mod likeness;
 mod navigate;
@@ -27,6 +28,7 @@ pub use agent_choice::AgentChoice;
 pub use comments::{CommentRow, CommentsPane, label as comment_label};
 pub use files::{FileState, NoteLine, NoteStyle, Source, code_widths};
 pub use filter::FileFilter;
+pub use help::help_height;
 pub use persist::{Store, open as persist_open};
 pub use picker::ThemePicker;
 pub use runlog::{RunLog, RunStatus, follow_top, format_elapsed};
@@ -216,6 +218,8 @@ pub struct AppState {
     pub confirm: Option<Confirm>,
     pub message: Option<Message>,
     pub help: bool,
+    /// First key line the keys popup shows.
+    pub help_scroll: usize,
     pub layout: Layout,
     /// The run command has been started at least once this session.
     pub ran: bool,
@@ -280,6 +284,7 @@ impl AppState {
             confirm: None,
             message: None,
             help: false,
+            help_scroll: 0,
             layout: Layout::default(),
             ran: false,
             multiplexers: crate::run::Multiplexers::default(),
@@ -500,7 +505,15 @@ impl AppState {
                 .saturating_sub(3)
                 .saturating_sub(self.run_pane_height()),
         );
-        (usize::from(width.saturating_sub(2)), height.max(1))
+        let text = usize::from(width.saturating_sub(2)).saturating_sub(self.scrollbar_columns());
+        (text, height.max(1))
+    }
+
+    /// Columns a pane keeps at its right edge for the scrollbar: one while it
+    /// is the scroll style, whether or not anything is out of view, so text
+    /// never re-wraps when the bar comes and goes.
+    pub fn scrollbar_columns(&self) -> usize {
+        usize::from(self.config.scroll == crate::config::ScrollStyle::Scrollbar)
     }
 
     pub fn tree_height(&self) -> usize {
