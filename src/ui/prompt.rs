@@ -34,12 +34,12 @@ pub const MAX_WIDTH: u16 = 80;
 pub const POPUP_LIFT_PERCENT: u16 = 20;
 
 /// Top row of a popup `height` rows tall, centred in `area` and then lifted
-/// by `POPUP_LIFT_PERCENT`, never above `area`'s top.
+/// by `POPUP_LIFT_PERCENT`, but by no more than half the room above it, so a
+/// tall popup keeps a margin instead of sticking to the top.
 pub fn lifted_top(area: Rect, height: u16) -> u16 {
-    let centred = area.y + area.height.saturating_sub(height) / 2;
-    centred
-        .saturating_sub(area.height * POPUP_LIFT_PERCENT / 100)
-        .max(area.y)
+    let above = area.height.saturating_sub(height) / 2;
+    let lift = (area.height * POPUP_LIFT_PERCENT / 100).min(above / 2);
+    area.y + above - lift
 }
 
 /// Where the popup goes inside `pane`. `anchor` is the on-screen rows
@@ -223,12 +223,20 @@ mod tests {
     fn popup_without_an_anchor_sits_above_centre_and_height_is_capped() {
         let area = place(PANE, None, 40);
         assert_eq!(area.height, MAX_TEXT_LINES + 2);
+        let above = (40 - area.height) / 2;
         assert_eq!(
             area.y,
-            (40 - area.height) / 2 - 40 * POPUP_LIFT_PERCENT / 100
+            above - (40 * POPUP_LIFT_PERCENT / 100).min(above / 2)
         );
         let small = Rect { height: 6, ..PANE };
         assert_eq!(lifted_top(small, 5), small.y, "never above the pane");
+        // A tall popup keeps half the room above it instead of the top row.
+        assert_eq!(lifted_top(PANE, 24) - PANE.y, 4);
+        // A short one is lifted the full share.
+        assert_eq!(
+            lifted_top(PANE, 4) - PANE.y,
+            18 - 40 * POPUP_LIFT_PERCENT / 100
+        );
     }
 
     #[test]

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A tall popup no longer sticks to the top of the screen: popups are still
+  lifted above the middle, but by at most half the room above them.
+
 ## 0.6.0 - 2026-11-20
 
 ### Changed
