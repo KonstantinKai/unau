@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Reviewing a commit, the keys popup crossed out `s`, `u` and `d` but not
+  `gs`, `gu` and `gd`, which are just as unavailable there.
+
 ## 0.7.0 - 2026-11-24
 
 ### Added

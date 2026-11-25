@@ -370,7 +370,15 @@ fn right_end(notice: Option<String>, used: usize, width: u16) -> (Option<String>
 
 /// Keys that do nothing in a commit or range.
 fn disabled_in_range(action: Action) -> bool {
-    matches!(action, Action::Stage | Action::Unstage | Action::Discard)
+    matches!(
+        action,
+        Action::Stage
+            | Action::Unstage
+            | Action::Discard
+            | Action::StageFile
+            | Action::UnstageFile
+            | Action::DiscardFile
+    )
 }
 
 /// Width of the help's key column, keys right-aligned in it.
@@ -562,8 +570,10 @@ mod tests {
         let mut s = state(&f);
         s.target = f.repo.commit_range("HEAD").unwrap();
         let lines = help_lines(&s);
-        let stage = lines.iter().find(|(k, ..)| k == "s").unwrap();
-        assert!(stage.2 && stage.1.contains("disabled"));
+        for key in ["s", "u", "d", "gs", "gu", "gd"] {
+            let line = lines.iter().find(|(k, ..)| k == key).unwrap();
+            assert!(line.2 && line.1.contains("disabled"), "{key}");
+        }
         let comment = lines.iter().find(|(k, ..)| k == "c").unwrap();
         assert!(!comment.2);
     }
