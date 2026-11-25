@@ -81,6 +81,7 @@ actions! {
     RunPane = "run_pane" ["R"] "show or hide the run pane",
     EditConfig = "edit_config" [","] "edit your config in $EDITOR",
     Themes = "themes" ["T"] "pick a theme, previewed live, saved to your config",
+    Commits = "commits" ["p"] "review a commit, or go back to the working tree",
     EditInstructions = "edit_instructions" ["i"] "edit the agent instructions in $EDITOR",
     OpenFile = "open_file" ["o"] "open the file in $EDITOR at the cursor line",
     Accept = "accept" ["a"] "accept fix (re-review)",

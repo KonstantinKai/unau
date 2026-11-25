@@ -11,6 +11,9 @@ impl AppState {
         if self.prompt.is_some() {
             return self.prompt_key(key);
         }
+        if self.commits.is_some() {
+            return self.commits_key(key);
+        }
         if self.theme_picker.is_some() {
             return self.theme_picker_key(key);
         }
@@ -139,6 +142,7 @@ impl AppState {
             Action::RunPane => return self.toggle_run_pane(),
             Action::EditConfig => return self.edit_config(),
             Action::Themes => self.open_theme_picker(),
+            Action::Commits => self.open_commits(),
             Action::EditInstructions => return self.edit_instructions(),
             Action::OpenFile => return self.open_file(),
             Action::Accept => self.accept(),

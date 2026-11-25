@@ -100,6 +100,13 @@ unau --licenses      # print the license and third-party notices
 A path that exists wins over a revision with the same name; `--` forces the
 path reading.
 
+Inside unau, `p` lists the working tree and the history, newest first (`/`
+filters by id or subject). Picking a commit shows what it changed, read-only,
+and comments on it go to a review of their own (`base: <parent>..<commit>`);
+picking it again later reopens that review. Picking the working tree brings
+back its review as you left it. With nothing changed in the working tree, the
+diff pane says so and points at `p`.
+
 The working tree view shows each file's unstaged lines and, under a `staged`
 strip, the lines already in the index. Staged means accepted: staged lines never
 appear in the review. Staging the lines of an item the agent ticked accepts
@@ -184,6 +191,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `R` | show / hide the run pane |
 | `,` | open your config in `$EDITOR` (created with every setting commented out the first time) |
 | `T` | pick a theme, previewed live; `Enter` saves it to your config |
+| `p` | review a commit: pick one from the history (`/` filters), or the working tree to go back |
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
 | `a` | accept a done item: stage its hunk, keep it in the review marked accepted |

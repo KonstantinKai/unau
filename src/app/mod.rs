@@ -5,6 +5,7 @@ mod accept;
 mod agent_choice;
 mod annotate;
 mod comments;
+mod commits;
 mod files;
 mod filter;
 mod folding;
@@ -26,6 +27,7 @@ mod stage;
 
 pub use agent_choice::AgentChoice;
 pub use comments::{CommentRow, CommentsPane, label as comment_label};
+pub use commits::CommitPicker;
 pub use files::{FileState, NoteLine, NoteStyle, Source, code_widths};
 pub use filter::FileFilter;
 pub use help::help_height;
@@ -245,6 +247,11 @@ pub struct AppState {
     pub comments: CommentsPane,
     /// The theme picker, while it is open.
     pub theme_picker: Option<ThemePicker>,
+    /// The commit picker, while it is open.
+    pub commits: Option<CommitPicker>,
+    /// The working tree's review and store, kept aside while a commit is
+    /// shown.
+    pub home: Option<(Review, Store)>,
     /// What narrows the files pane.
     pub filter: FileFilter,
     /// The line number typed so far, while the go-to-line popup is open.
@@ -298,6 +305,8 @@ impl AppState {
             update: None,
             comments: CommentsPane::default(),
             theme_picker: None,
+            commits: None,
+            home: None,
             filter: FileFilter::default(),
             goto: None,
             all_paths: 0,

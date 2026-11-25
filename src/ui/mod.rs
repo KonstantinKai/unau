@@ -3,6 +3,7 @@
 
 mod agent_choice;
 mod comments;
+mod commits;
 mod confirm;
 mod diff;
 mod goto;
@@ -68,6 +69,7 @@ pub fn render(state: &AppState, frame: &mut Frame) {
     confirm::render(state, frame, main, colors);
     agent_choice::render(state, frame, main, colors);
     picker::render(state, frame, main, colors);
+    commits::render(state, frame, main, colors);
     render_status(state, frame, status, colors);
     if state.help {
         dim(state, frame, frame.area(), colors);
@@ -321,7 +323,7 @@ fn render_status(state: &AppState, frame: &mut Frame, area: Rect, colors: &Color
         Line::styled(
             format!(
                 "{} · {open} open{} · {done} done · {file} · {} help · {} quit",
-                state.target.base(),
+                state.target.label(),
                 comments::working(state),
                 state.key_label(Action::Help),
                 state.key_label(Action::Quit),

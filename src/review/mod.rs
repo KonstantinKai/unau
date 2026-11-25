@@ -276,8 +276,29 @@ impl Review {
 /// The newest review in `dir`: the highest date, then the highest number,
 /// compared as a number so `-100` comes after `-99`. Other files are ignored.
 pub fn latest(dir: &Path) -> Option<std::path::PathBuf> {
-    let entries = std::fs::read_dir(dir).ok()?;
-    entries
+    reviews_in(dir).pop()
+}
+
+/// The newest review in `dir` written against `base`, such as one commit.
+pub fn for_base(dir: &Path, base: &str) -> Option<std::path::PathBuf> {
+    let wanted = format!("base: {base}");
+    reviews_in(dir).into_iter().rev().find(|path| {
+        std::fs::read_to_string(path).is_ok_and(|text| {
+            // The base is in the front matter, before the first heading.
+            text.lines()
+                .take_while(|l| !l.starts_with('#'))
+                .any(|l| l.trim_end() == wanted)
+        })
+    })
+}
+
+/// Review files in `dir`, oldest first: by date, then by number compared as a
+/// number. Other files are ignored.
+fn reviews_in(dir: &Path) -> Vec<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut found: Vec<((String, u64), std::path::PathBuf)> = entries
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let name = entry.file_name().to_str()?.strip_suffix(".md")?.to_owned();
@@ -293,8 +314,9 @@ pub fn latest(dir: &Path) -> Option<std::path::PathBuf> {
                 });
             valid_date.then(|| ((date.to_owned(), number), entry.path()))
         })
-        .max_by(|a, b| a.0.cmp(&b.0))
-        .map(|(_, path)| path)
+        .collect();
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found.into_iter().map(|(_, path)| path).collect()
 }
 
 /// `YYYY-MM-DD-NN` for the first file name not yet taken in `dir` on `date`.

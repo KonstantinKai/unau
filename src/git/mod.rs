@@ -57,6 +57,32 @@ impl Target {
     pub fn is_range(&self) -> bool {
         matches!(self, Self::Range { .. })
     }
+
+    /// `base()` for people: full commit ids cut to their first seven
+    /// characters, names left as they are.
+    pub fn label(&self) -> String {
+        let short = |rev: &str| {
+            if rev.len() == 40 && rev.chars().all(|c| c.is_ascii_hexdigit()) {
+                rev[..7].to_owned()
+            } else {
+                rev.to_owned()
+            }
+        };
+        match self {
+            Self::WorkTree => "HEAD".to_owned(),
+            Self::Range { from, to } => format!("{}..{}", short(from), short(to)),
+        }
+    }
+}
+
+/// One commit of the history, as the commit picker lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Commit {
+    pub id: String,
+    pub short: String,
+    /// When, relative to now: `3 days ago`.
+    pub when: String,
+    pub subject: String,
 }
 
 #[derive(Clone, Debug)]
@@ -207,6 +233,33 @@ impl Repo {
             Target::Range { to, .. } => self.run(&["rev-parse", &format!("{to}:{path}")])?,
         };
         Ok(id.trim().to_owned())
+    }
+
+    /// Up to `count` commits of `HEAD`'s history after the newest `skip`,
+    /// newest first. A repository without commits has none.
+    pub fn log(&self, skip: usize, count: usize) -> Vec<Commit> {
+        let skip = format!("--skip={skip}");
+        let count = format!("--max-count={count}");
+        let Ok(text) = self.run(&[
+            "log",
+            &skip,
+            &count,
+            "--format=%H%x1f%h%x1f%ar%x1f%s",
+            "HEAD",
+        ]) else {
+            return Vec::new();
+        };
+        text.lines()
+            .filter_map(|line| {
+                let mut fields = line.splitn(4, '\u{1f}');
+                Some(Commit {
+                    id: fields.next()?.to_owned(),
+                    short: fields.next()?.to_owned(),
+                    when: fields.next()?.to_owned(),
+                    subject: fields.next()?.to_owned(),
+                })
+            })
+            .collect()
     }
 
     /// Contents of the blob `id`, when git has it.

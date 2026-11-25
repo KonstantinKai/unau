@@ -43,9 +43,12 @@ pub fn render(state: &AppState, frame: &mut Frame, area: Rect, colors: &Colors) 
     frame.render_widget(block, area);
     let Some(file) = &state.file else {
         let text = if state.tree.is_empty() {
-            "no changes to review"
+            match state.key_label(Action::Commits) {
+                key if key.is_empty() => "no changes to review".to_owned(),
+                key => format!("no changes to review · {key}: review a commit"),
+            }
         } else {
-            "select a file"
+            "select a file".to_owned()
         };
         frame.render_widget(
             Paragraph::new(text).style(Style::new().fg(colors.muted)),

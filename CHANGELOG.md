@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `p` opens a commit picker: the working tree, then the history newest
+  first, filtered with `/`. Picking a commit shows what it changed, without
+  restarting unau, and comments on it go to a review of their own, which
+  picking the commit again reopens. Picking the working tree brings back its
+  review as you left it. A clean working tree says `p: review a commit`
+  instead of only "no changes to review".
+
 ### Fixed
 
 - Reviewing a commit, the keys popup crossed out `s`, `u` and `d` but not
