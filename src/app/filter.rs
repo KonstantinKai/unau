@@ -36,7 +36,7 @@ impl AppState {
             }
             KeyCodeKey::Char('w') => {
                 let chars: Vec<char> = self.filter.text.chars().collect();
-                let start = super::input::word_start(&chars, chars.len());
+                let start = super::prompt::word_start(&chars, chars.len());
                 self.filter.text = chars[..start].iter().collect();
             }
             KeyCodeKey::Enter => {
