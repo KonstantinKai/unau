@@ -103,7 +103,9 @@ path reading.
 Inside unau, `p` lists the working tree and the history, newest first (`/`
 filters by id or subject). Picking a commit shows what it changed, read-only,
 and comments on it go to a review of their own (`base: <parent>..<commit>`);
-picking it again later reopens that review. Picking the working tree brings
+picking it again later reopens that review. For a range, `v` marks one end
+and Enter on the other reviews every commit in between, both ends included,
+like `unau oldest^..newest`. Picking the working tree brings
 back its review as you left it. With nothing changed in the working tree, the
 diff pane says so and points at `p`.
 
@@ -191,7 +193,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `R` | show / hide the run pane |
 | `,` | open your config in `$EDITOR` (created with every setting commented out the first time) |
 | `T` | pick a theme, previewed live; `Enter` saves it to your config |
-| `p` | review a commit: pick one from the history (`/` filters), or the working tree to go back |
+| `p` | review a commit or a range: pick one from the history (`v` marks a range's end, `/` filters), or the working tree to go back |
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
 | `a` | accept a done item: stage its hunk, keep it in the review marked accepted |

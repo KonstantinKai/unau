@@ -57,8 +57,10 @@ pub fn render(state: &AppState, frame: &mut Frame, main: Rect, colors: &Colors) 
     };
     let hint = if picker.typing {
         " Enter keep filter · Esc clear "
+    } else if picker.anchor.is_some() {
+        " Enter review the range · v or Esc drop it "
     } else {
-        " Enter open · / filter · Esc close "
+        " Enter open · v range · / filter · Esc close "
     };
     let marks = Scroll {
         total: rows,
@@ -99,9 +101,18 @@ fn list_lines(
         Target::WorkTree => None,
         Target::Range { to, .. } => Some(to.as_str()),
     };
-    let row_style = |row: usize| {
+    // The marked range lights up like a selection in the diff, the cursor's
+    // row brighter on top.
+    let marked = picker.marked();
+    let in_range = |index: usize| {
+        marked.is_some_and(|(newest, oldest)| (newest..=oldest).contains(&index))
+            || picker.anchor == Some(index)
+    };
+    let row_style = |row: usize, commit: Option<usize>| {
         if row == picker.cursor {
             Style::new().bg(colors.cursor_bg)
+        } else if commit.is_some_and(in_range) {
+            Style::new().bg(colors.selection_bg)
         } else {
             Style::new()
         }
@@ -115,7 +126,7 @@ fn list_lines(
                 Style::new().fg(colors.text).add_modifier(Modifier::BOLD),
             ),
         ])
-        .style(row_style(0)),
+        .style(row_style(0, None)),
     ];
     for (n, index) in shown.iter().enumerate() {
         let commit = &picker.commits[*index];
@@ -138,7 +149,7 @@ fn list_lines(
                 Span::styled(subject, Style::new().fg(colors.text)),
                 Span::styled(when, Style::new().fg(colors.muted)),
             ])
-            .style(row_style(n + 1)),
+            .style(row_style(n + 1, Some(*index))),
         );
     }
     lines

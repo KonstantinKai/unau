@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The commit picker (`p`) reviews ranges too: `v` marks one end, the
+  commits between it and the cursor light up, and Enter reviews all of them,
+  both ends included, with a review of their own. `Esc` drops the marked
+  end before it closes the picker.
+
 ## 0.8.0 - 2026-11-25
 
 ### Added

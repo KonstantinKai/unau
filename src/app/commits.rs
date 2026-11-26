@@ -26,6 +26,9 @@ pub struct CommitPicker {
     pub cursor: usize,
     /// `git log` may have more after the last commit read.
     pub more: bool,
+    /// The commit `v` marked as one end of a range, by index into `commits`;
+    /// the cursor's commit is the other end.
+    pub anchor: Option<usize>,
 }
 
 impl CommitPicker {
@@ -47,6 +50,22 @@ impl CommitPicker {
     /// Rows the picker lists: the working tree, then each commit shown.
     pub fn rows(&self) -> usize {
         1 + self.shown().len()
+    }
+
+    /// The commit under the cursor, by index into `commits`; none on the
+    /// working tree's row.
+    pub fn cursor_commit(&self) -> Option<usize> {
+        self.cursor
+            .checked_sub(1)
+            .and_then(|row| self.shown().get(row).copied())
+    }
+
+    /// The marked range as (newest, oldest) indexes into `commits`, both
+    /// ends included, while `v` has marked one end and the cursor is on a
+    /// commit.
+    pub fn marked(&self) -> Option<(usize, usize)> {
+        let (anchor, cursor) = (self.anchor?, self.cursor_commit()?);
+        Some((anchor.min(cursor), anchor.max(cursor)))
     }
 }
 
@@ -100,8 +119,18 @@ impl AppState {
             Lookup::Pending | Lookup::None => None,
         };
         match (key.code, action) {
+            // Esc drops a marked range first, then closes.
+            (KeyCodeKey::Esc, _) if picker.anchor.is_some() => picker.anchor = None,
             (KeyCodeKey::Esc, _) | (_, Some(Action::Commits)) => self.commits = None,
+            (KeyCodeKey::Enter, _) if picker.anchor.is_some() && picker.cursor == 0 => {
+                self.error("a range runs between two commits, not to the working tree");
+            }
             (KeyCodeKey::Enter, _) => return self.pick_commit(),
+            (_, Some(Action::Select)) => match (picker.anchor, picker.cursor_commit()) {
+                (Some(_), _) => picker.anchor = None,
+                (None, Some(commit)) => picker.anchor = Some(commit),
+                (None, None) => self.error("mark a commit to start a range"),
+            },
             (_, Some(Action::Filter)) => picker.typing = true,
             (_, Some(Action::Down)) => {
                 picker.cursor = (picker.cursor + 1).min(picker.rows() - 1);
@@ -131,11 +160,20 @@ impl AppState {
         picker.commits.extend(next);
     }
 
-    /// Enter: review what the cursor is on.
+    /// Enter: review what the cursor is on, or the marked range.
     fn pick_commit(&mut self) -> Effect {
         let Some(list) = self.commits.take() else {
             return Effect::None;
         };
+        if let Some((newest, oldest)) = list.marked()
+            && newest != oldest
+        {
+            return self.pick_range(
+                &list.commits[newest],
+                &list.commits[oldest],
+                oldest - newest + 1,
+            );
+        }
         let chosen = match list.cursor {
             0 => None,
             row => list.shown().get(row - 1).map(|i| list.commits[*i].clone()),
@@ -158,6 +196,31 @@ impl AppState {
             None => self.info("back to the working tree"),
             Some(commit) => self.info(format!("reviewing {} {}", commit.short, commit.subject)),
         }
+        Effect::None
+    }
+
+    /// Reviews `oldest` through `newest`, both included: from `oldest`'s
+    /// parent to `newest`, as `unau oldest^..newest` does.
+    fn pick_range(&mut self, newest: &Commit, oldest: &Commit, count: usize) -> Effect {
+        let target = match self.repo.commit_range(&oldest.id) {
+            Ok(Target::Range { from, .. }) => Target::Range {
+                from,
+                to: newest.id.clone(),
+            },
+            Ok(Target::WorkTree) => return Effect::None,
+            Err(err) => {
+                self.error(format!("{err:#}"));
+                return Effect::None;
+            }
+        };
+        if let Err(err) = self.switch_target(target) {
+            self.error(format!("{err:#}"));
+            return Effect::None;
+        }
+        self.info(format!(
+            "reviewing {}..{} ({count} commits)",
+            oldest.short, newest.short
+        ));
         Effect::None
     }
 
@@ -274,5 +337,45 @@ mod tests {
         press(&mut s, "\x1b");
         assert!(s.commits.is_none());
         assert_eq!(s.target, Target::WorkTree);
+    }
+
+    #[test]
+    fn v_marks_a_range_and_enter_reviews_every_commit_in_it() {
+        let f = Fixture::new();
+        f.write("a.txt", "one\n");
+        f.commit_all("first");
+        f.write("b.txt", "two\n");
+        f.commit_all("second");
+        f.write("c.txt", "three\n");
+        f.commit_all("third");
+        let mut s = state(&f);
+        // Esc drops a marked end before it closes the picker.
+        press(&mut s, "pjv\x1b");
+        assert!(s.commits.as_ref().unwrap().anchor.is_none());
+        // `third` down to `second`: both included, `first` left out.
+        press(&mut s, "vj");
+        assert_eq!(s.commits.as_ref().unwrap().marked(), Some((0, 1)));
+        press(&mut s, "\n");
+        assert!(s.commits.is_none());
+        let first = f.git(&["rev-parse", "HEAD~2"]).trim().to_owned();
+        let third = f.git(&["rev-parse", "HEAD"]).trim().to_owned();
+        assert_eq!(
+            s.target,
+            Target::Range {
+                from: first,
+                to: third
+            }
+        );
+        assert_eq!(s.paths, ["b.txt", "c.txt"]);
+        // A range cannot end at the working tree.
+        press(&mut s, "pvkk\n");
+        assert!(s.commits.is_some());
+        assert!(
+            s.message
+                .as_ref()
+                .unwrap()
+                .text
+                .contains("between two commits")
+        );
     }
 }
