@@ -9,6 +9,7 @@ mod diff;
 mod goto;
 mod picker;
 mod prompt;
+mod reviews;
 mod runpane;
 mod scroll;
 
@@ -70,6 +71,7 @@ pub fn render(state: &AppState, frame: &mut Frame) {
     agent_choice::render(state, frame, main, colors);
     picker::render(state, frame, main, colors);
     commits::render(state, frame, main, colors);
+    reviews::render(state, frame, main, colors);
     render_status(state, frame, status, colors);
     if state.help {
         dim(state, frame, frame.area(), colors);

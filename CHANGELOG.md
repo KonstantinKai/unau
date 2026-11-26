@@ -4,6 +4,10 @@
 
 ### Added
 
+- `O` opens a review picker: every review in the review folder, newest
+  first, with its status, what it reviews, its open, done and accepted
+  counts and its first comment, filtered with `/`. Enter opens one without
+  restarting unau, as `--review` would.
 - The commit picker (`p`) reviews ranges too: `v` marks one end, the
   commits between it and the cursor light up, and Enter reviews all of them,
   both ends included, with a review of their own. `Esc` drops the marked

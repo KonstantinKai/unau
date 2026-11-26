@@ -271,7 +271,7 @@ impl AppState {
     }
 
     /// Shows the open review against `view`.
-    fn show(&mut self, view: Target) -> Result<()> {
+    pub(super) fn show(&mut self, view: Target) -> Result<()> {
         self.target = view;
         self.file = None;
         self.tree_cursor = 0;

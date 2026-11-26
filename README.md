@@ -115,6 +115,11 @@ its comments on the fixed lines, and `a` stages each fix as in any
 re-review; the status line says `HEAD · review of <commit>`. Enter on the
 commit in `p` switches between the commit itself and its fixes.
 
+`O` lists every review in the review folder, newest first: its status, what
+it reviews, how many items are open, done and accepted, and its first
+comment (`/` filters). Enter opens one in place of the review open now, as
+`--review` would, a commit's review with ticked items on its fixes.
+
 The working tree view shows each file's unstaged lines and, under a `staged`
 strip, the lines already in the index. Staged means accepted: staged lines never
 appear in the review. Staging the lines of an item the agent ticked accepts
@@ -200,6 +205,7 @@ one small file per repository and never inside it; delete one to start clean.
 | `,` | open your config in `$EDITOR` (created with every setting commented out the first time) |
 | `T` | pick a theme, previewed live; `Enter` saves it to your config |
 | `p` | review a commit or a range: pick one from the history (`v` marks a range's end, `/` filters), or the working tree to go back |
+| `O` | open a review from the review folder (`/` filters) |
 | `i` | open the agent instructions in `$EDITOR` (see below) |
 | `o` | open the file in `$EDITOR`: from the diff at the cursor line, from the files pane the file under the cursor; the diff is re-read when the editor closes |
 | `a` | accept a done item: stage its hunk, keep it in the review marked accepted |

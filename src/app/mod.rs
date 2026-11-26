@@ -22,6 +22,7 @@ mod prompt;
 mod rereview;
 mod resume;
 mod reviewed;
+mod reviews;
 mod runlog;
 mod settings;
 mod stage;
@@ -35,6 +36,7 @@ pub use filter::FileFilter;
 pub use help::help_height;
 pub use persist::{Store, open as persist_open};
 pub use picker::ThemePicker;
+pub use reviews::{ReviewEntry, ReviewPicker};
 pub use runlog::{RunLog, RunStatus, follow_top, format_elapsed};
 pub use settings::ConfigFiles;
 
@@ -250,6 +252,8 @@ pub struct AppState {
     pub theme_picker: Option<ThemePicker>,
     /// The commit picker, while it is open.
     pub commits: Option<CommitPicker>,
+    /// The review picker, while it is open.
+    pub reviews: Option<ReviewPicker>,
     /// The working tree's review and store, kept aside while a commit is
     /// shown.
     pub home: Option<(Review, Store)>,
@@ -307,6 +311,7 @@ impl AppState {
             comments: CommentsPane::default(),
             theme_picker: None,
             commits: None,
+            reviews: None,
             home: None,
             filter: FileFilter::default(),
             goto: None,

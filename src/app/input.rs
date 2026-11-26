@@ -9,6 +9,9 @@ impl AppState {
         if self.prompt.is_some() {
             return self.prompt_key(key);
         }
+        if self.reviews.is_some() {
+            return self.reviews_key(key);
+        }
         if self.commits.is_some() {
             return self.commits_key(key);
         }
@@ -141,6 +144,7 @@ impl AppState {
             Action::EditConfig => return self.edit_config(),
             Action::Themes => self.open_theme_picker(),
             Action::Commits => self.open_commits(),
+            Action::Reviews => self.open_reviews(),
             Action::EditInstructions => return self.edit_instructions(),
             Action::OpenFile => return self.open_file(),
             Action::Accept => self.accept(),

@@ -294,7 +294,7 @@ pub fn for_base(dir: &Path, base: &str) -> Option<std::path::PathBuf> {
 
 /// Review files in `dir`, oldest first: by date, then by number compared as a
 /// number. Other files are ignored.
-fn reviews_in(dir: &Path) -> Vec<std::path::PathBuf> {
+pub fn reviews_in(dir: &Path) -> Vec<std::path::PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
