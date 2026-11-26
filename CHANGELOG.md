@@ -8,6 +8,13 @@
   commits between it and the cursor light up, and Enter reviews all of them,
   both ends included, with a review of their own. `Esc` drops the marked
   end before it closes the picker.
+- Comments on a commit can be followed up. The agent fixes them in the
+  working tree, where the commit's view never showed them, and the working
+  tree's view did not show the commit's comments. Now a commit's review with
+  ticked items opens on the working tree, each comment under the line that
+  fixed it, and `a` stages the fix. Enter on the commit in `p` switches
+  between the commit and its fixes, and ticks arriving while the commit is
+  shown say where to look.
 
 ## 0.8.0 - 2026-11-25
 

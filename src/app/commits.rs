@@ -83,11 +83,12 @@ impl AppState {
             more,
             ..CommitPicker::default()
         };
-        if let Target::Range { to, .. } = &self.target {
+        // The commit whose review is open, shown itself or as its fixes.
+        if let Target::Range { to, .. } = Target::from_base(&self.review.base) {
             picker.cursor = picker
                 .commits
                 .iter()
-                .position(|c| &c.id == to)
+                .position(|c| c.id == to)
                 .map_or(0, |i| i + 1);
         }
         self.commits = Some(picker);
@@ -194,6 +195,12 @@ impl AppState {
         }
         match chosen {
             None => self.info("back to the working tree"),
+            Some(commit) if self.follow_up() => self.info(format!(
+                "the fixes for {} {}, in the working tree · {}, Enter on it: the commit",
+                commit.short,
+                commit.subject,
+                self.key_label(Action::Commits)
+            )),
             Some(commit) => self.info(format!("reviewing {} {}", commit.short, commit.subject)),
         }
         Effect::None
@@ -224,27 +231,48 @@ impl AppState {
         Effect::None
     }
 
-    /// Shows `target` with its own review: the working tree's kept aside or
-    /// brought back, a commit's found in the review folder or started fresh.
-    pub(super) fn switch_target(&mut self, target: Target) -> Result<()> {
-        if target == self.target {
+    /// Opens the review of `base`, a commit or the working tree: the working
+    /// tree's kept aside or brought back, a commit's found in the review
+    /// folder or started fresh, and shown per `view_of`. Picking the commit
+    /// whose review is already open switches between the commit itself and
+    /// the working tree with the fixes made for it.
+    pub(super) fn switch_target(&mut self, base: Target) -> Result<()> {
+        let open = Target::from_base(&self.review.base);
+        if base.is_range() && base == open {
+            let view = if self.target.is_range() && self.review.done_items() > 0 {
+                Target::WorkTree
+            } else {
+                base
+            };
+            return if view == self.target {
+                Ok(())
+            } else {
+                self.show(view)
+            };
+        }
+        if base == Target::WorkTree && open == Target::WorkTree {
             return Ok(());
         }
-        let (review, store) = match &target {
-            Target::WorkTree => self.home.take().unwrap_or_else(|| fresh(&target)),
-            Target::Range { .. } => {
-                match review::for_base(&self.repo.review_dir(), &target.base()) {
-                    Some(path) => super::persist_open(path)?,
-                    None => fresh(&target),
-                }
-            }
+        let (review, store) = match &base {
+            Target::WorkTree => self.home.take().unwrap_or_else(|| fresh(&base)),
+            Target::Range { .. } => match review::for_base(&self.repo.review_dir(), &base.base()) {
+                Some(path) => super::persist_open(path)?,
+                None => fresh(&base),
+            },
         };
         let old_review = std::mem::replace(&mut self.review, review);
         let old_store = std::mem::replace(&mut self.store, store);
-        if self.target == Target::WorkTree {
+        // Only the working tree's own review is kept aside; a commit's is on
+        // disk and is found there again.
+        if open == Target::WorkTree {
             self.home = Some((old_review, old_store));
         }
-        self.target = target;
+        self.show(view_of(&self.review))
+    }
+
+    /// Shows the open review against `view`.
+    fn show(&mut self, view: Target) -> Result<()> {
+        self.target = view;
         self.file = None;
         self.tree_cursor = 0;
         self.tree_scroll = 0;
@@ -253,6 +281,23 @@ impl AppState {
         self.rebuild_comments();
         self.scroll_to_cursor();
         Ok(())
+    }
+
+    /// The working tree shown with a commit's review: the fixes an agent made
+    /// for comments on that commit.
+    pub fn follow_up(&self) -> bool {
+        self.target == Target::WorkTree && Target::from_base(&self.review.base).is_range()
+    }
+}
+
+/// What a review is shown against: its own base, except a commit's review
+/// with items the agent ticked, whose fixes are in the working tree.
+pub fn view_of(review: &Review) -> Target {
+    let base = Target::from_base(&review.base);
+    if base.is_range() && review.done_items() > 0 {
+        Target::WorkTree
+    } else {
+        base
     }
 }
 
@@ -377,5 +422,72 @@ mod tests {
                 .text
                 .contains("between two commits")
         );
+    }
+
+    #[test]
+    fn a_commit_review_the_agent_ticked_shows_its_fixes_in_the_working_tree() {
+        let f = Fixture::new();
+        f.write("a.txt", "one\n");
+        f.commit_all("first");
+        f.write("a.txt", "two\n");
+        f.commit_all("second");
+        let mut s = state(&f);
+        // Comment on the committed line.
+        press(&mut s, "pj\n");
+        s.focus = Pane::Diff;
+        press(&mut s, "jcname it better\n");
+        let path = s.review_path().unwrap().clone();
+        // The agent fixes it in the working tree and ticks the item.
+        f.write("a.txt", "TWO\n");
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, text.replace("- [ ] fix", "- [x] fix")).unwrap();
+        assert!(s.poll_review());
+        let message = s.message.as_ref().unwrap().text.clone();
+        assert!(
+            message.contains("fixes are in the working tree"),
+            "{message}"
+        );
+        // Enter on the commit again: the working tree, with this review.
+        press(&mut s, "p\n");
+        assert!(s.follow_up(), "{:?}", s.target);
+        assert_eq!(s.review_path(), Some(&path));
+        let file = s.file.as_ref().unwrap();
+        let note = file
+            .view
+            .rows
+            .iter()
+            .position(|r| *r == crate::diff::Row::Note(0))
+            .unwrap();
+        assert!(matches!(
+            file.view.rows[note - 1],
+            crate::diff::Row::Code { section, lines } if lines.iter().flatten().any(|i| {
+                file.sections[section].diff.lines[*i].text == "TWO"
+            })
+        ));
+        // `a` stages the fix, as in any re-review.
+        s.file.as_mut().unwrap().cursor = note;
+        press(&mut s, "a");
+        assert!(s.review.items[0].accepted, "{:?}", s.message);
+        assert!(f.git(&["diff", "--cached"]).contains("+TWO"));
+        // And Enter on the commit once more shows the commit itself.
+        press(&mut s, "p\n");
+        assert!(s.target.is_range());
+        assert!(!s.follow_up());
+    }
+
+    #[test]
+    fn reopening_a_ticked_commit_review_opens_on_the_working_tree() {
+        let mut review = crate::review::Review::new("x", "aaa..bbb");
+        assert!(super::view_of(&review).is_range());
+        let mut item = crate::review::Item::new(
+            crate::review::Kind::Fix,
+            crate::review::Scope::General,
+            "x".into(),
+        );
+        item.done = true;
+        review.items.push(item);
+        assert_eq!(super::view_of(&review), Target::WorkTree);
+        review.items[0].accepted = true;
+        assert!(super::view_of(&review).is_range(), "nothing left to accept");
     }
 }

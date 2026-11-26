@@ -320,10 +320,15 @@ fn render_status(state: &AppState, frame: &mut Frame, area: Rect, colors: &Color
             || "no review file yet".to_owned(),
             |n| n.to_string_lossy().into_owned(),
         );
+        let shown = if state.follow_up() {
+            let of = crate::git::Target::from_base(&state.review.base).label();
+            format!("{} · review of {of}", state.target.label())
+        } else {
+            state.target.label()
+        };
         Line::styled(
             format!(
-                "{} · {open} open{} · {done} done · {file} · {} help · {} quit",
-                state.target.label(),
+                "{shown} · {open} open{} · {done} done · {file} · {} help · {} quit",
                 comments::working(state),
                 state.key_label(Action::Help),
                 state.key_label(Action::Quit),

@@ -97,7 +97,10 @@ fn list_lines(
     text_width: usize,
     colors: &Colors,
 ) -> Vec<Line<'static>> {
-    let current = match &state.target {
+    // What the open review is of: a commit stays marked while its fixes in
+    // the working tree are shown.
+    let open = Target::from_base(&state.review.base);
+    let current = match &open {
         Target::WorkTree => None,
         Target::Range { to, .. } => Some(to.as_str()),
     };

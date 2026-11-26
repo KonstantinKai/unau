@@ -109,6 +109,12 @@ like `unau oldest^..newest`. Picking the working tree brings
 back its review as you left it. With nothing changed in the working tree, the
 diff pane says so and points at `p`.
 
+An agent fixes a commit's comments in the working tree, not in the commit.
+So once it has ticked items, that review opens on the working tree instead,
+its comments on the fixed lines, and `a` stages each fix as in any
+re-review; the status line says `HEAD · review of <commit>`. Enter on the
+commit in `p` switches between the commit itself and its fixes.
+
 The working tree view shows each file's unstaged lines and, under a `staged`
 strip, the lines already in the index. Staged means accepted: staged lines never
 appear in the review. Staging the lines of an item the agent ticked accepts

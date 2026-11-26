@@ -21,7 +21,7 @@ use app::{AppState, EditPurpose, Effect, Store};
 use clap::Parser;
 use config::{Config, Key};
 use crossterm::event::{self, Event, KeyEventKind};
-use git::{Target, snapshot};
+use git::snapshot;
 use review::Review;
 use std::{
     io::Write,
@@ -69,7 +69,8 @@ fn start() -> Result<()> {
                 Some(Ok(repo)) => repo,
                 _ => git::Repo::discover(&cwd)?,
             };
-            let target = Target::from_base(&review.base);
+            // A commit's review the agent has ticked opens on its fixes.
+            let target = app::view_of(&review);
             (repo, target, review, store)
         } else {
             let (repo, target) = cli::resolve(args.target.as_deref(), args.path.as_deref(), &cwd)?;

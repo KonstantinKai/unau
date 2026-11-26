@@ -110,7 +110,15 @@ impl AppState {
         if self.comments.visible {
             self.rebuild_comments();
         }
-        if self.complete() {
+        // Ticks on a commit's review: the fixes are in the working tree, not
+        // in the commit on screen, so say where to see them.
+        if self.target.is_range() && self.review.done_items() > 0 {
+            let key = self.key_label(crate::config::Action::Commits);
+            self.info(format!(
+                "{} ticked: the fixes are in the working tree · {key}, Enter on this commit shows them",
+                self.review.done_items()
+            ));
+        } else if self.complete() {
             self.info("review complete: no open items and nothing left unstaged");
         }
     }

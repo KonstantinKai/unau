@@ -29,7 +29,7 @@ mod sync;
 
 pub use agent_choice::AgentChoice;
 pub use comments::{CommentRow, CommentsPane, label as comment_label};
-pub use commits::CommitPicker;
+pub use commits::{CommitPicker, view_of};
 pub use files::{FileState, NoteLine, NoteStyle, Source, code_widths};
 pub use filter::FileFilter;
 pub use help::help_height;
